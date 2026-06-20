@@ -1263,28 +1263,38 @@ async function sendQ(){
       // Google Search Grounding — Gemini searches darulifta.info,
       // shamela.ws, dorar.net and other Islamic sources automatically
       const useSearch=model==='gemini-2.5-flash'||model==='gemini-2.5-flash-lite'||model==='gemini-1.5-pro';
+      // Gemini 2.5 models think by default — thinkingBudget:0 disables it outright
+      // so the model's internal reasoning/tool-trace can never leak into the chat.
+      // gemini-1.5-pro has no thinking feature at all, so this is omitted for it.
+      const supportsThinkingConfig=model==='gemini-2.5-flash'||model==='gemini-2.5-flash-lite';
       const body={
         system_instruction:{parts:[{text:ragSystemPrompt}]},
         contents,
-        generationConfig:{temperature:0.1,top_p:0.3,top_k:10,maxOutputTokens:4096},
+        generationConfig:{
+          temperature:0.1,top_p:0.3,top_k:10,maxOutputTokens:4096,
+          ...(supportsThinkingConfig && {thinkingConfig:{thinkingBudget:0}})
+        },
         ...(useSearch && {tools:[{google_search:{}}]})
       };
       try{
         const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         const data=await res.json();
-        if(res.ok&&data.candidates?.[0]?.content?.parts?.[0]?.text){
-          const chunk=data.candidates[0].content.parts[0].text;
+        const respParts=data.candidates?.[0]?.content?.parts;
+        // Defense-in-depth: even with thinking disabled, filter out any part
+        // flagged thought:true so reasoning/tool-trace text can never display.
+        const usableParts=(respParts||[]).filter(p=>!p.thought&&p.text);
+        if(res.ok&&usableParts.length){
+          const chunk=usableParts.map(p=>p.text).join('');
           const fin=data.candidates[0].finishReason;
           // append search sources if grounding metadata present
+          // NOTE: groundingChunks[].web.uri is a vertexaisearch.cloud.google.com
+          // redirect link, not the real source — the actual domain is in .title.
           const gm=data.candidates[0].groundingMetadata;
           let srcNote='';
-          if(gm?.searchEntryPoint||gm?.groundingChunks?.length){
-            const srcs=(gm.groundingChunks||[]).map(c=>c.web?.uri).filter(Boolean);
-            const uniq=[...new Set(srcs.map(u=>{try{return new URL(u).hostname}catch(e){return u}}))];
-            // Filter internal/unwanted hosts from displayed sources
-            const hiddenHosts = ['vertexaisearch.cloud.google.com','googleapis.com','gstatic.com'];
-            const filtered = uniq.filter(h => !hiddenHosts.some(bad => h.includes(bad)));
-            if(filtered.length) srcNote='\n\n**مصادر:** '+filtered.map(h=>'`'+h+'`').join(' • ');
+          const srcTitles=(gm?.groundingChunks||[]).map(c=>c.web?.title).filter(Boolean);
+          if(srcTitles.length){
+            const uniq=[...new Set(srcTitles.map(t=>String(t).toLowerCase().replace(/^www\./,'')))];
+            srcNote='\n\n**مصادر:** '+uniq.map(h=>'`'+h+'`').join(' • ');
           }
           fullReply+=(fullReply?' ':'')+chunk+srcNote;
           if(fin==='MAX_TOKENS'){attempts=0;continue;}
