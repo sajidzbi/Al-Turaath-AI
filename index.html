@@ -449,11 +449,13 @@ a{text-decoration:none}
 @media(max-width:640px){
   .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:100}
   .sidebar:not(.collapsed){box-shadow:6px 0 24px rgba(0,0,0,.6)}
+  .sidebar:not(.collapsed) ~ .sidebar-backdrop{display:block}
   .msg-inner{padding:0 10px}
   .domain-nav{display:none}
   .bh-tagline{display:none}
   .q-ta{font-size:16px}
 }
+.sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99}
 html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
 .pwa-install-bar{display:none;align-items:center;justify-content:space-between;gap:10px;background:var(--gold-dim);border:1px solid var(--gold-b);border-radius:10px;padding:9px 12px;margin:8px 14px 0;font-size:.72rem;color:var(--text)}
 .pwa-install-bar.show{display:flex}
@@ -524,6 +526,7 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
     </button>
   </div>
 </aside>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 
 <!-- ══ MAIN ══ -->
 <div class="main">
@@ -1088,12 +1091,17 @@ async function importSessions(file){
   }catch(e){toast('File error','err');}
 }
 
+function closeSidebarMobile(){
+  if(window.innerWidth<=640)document.getElementById('sidebar').classList.add('collapsed');
+}
+
 function newChat(){
   activeId=null;
   document.getElementById('messages').innerHTML='';
   document.getElementById('welcome').style.display='';
   document.getElementById('qInput').value='';
   renderSidebar();
+  closeSidebarMobile();
 }
 
 async function loadSess(id){
@@ -1110,6 +1118,7 @@ async function loadSess(id){
   });
   renderSidebar();
   document.getElementById('msgsWrap').scrollTop=9999;
+  closeSidebarMobile();
 }
 
 function delSessById(id){
