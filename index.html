@@ -1286,17 +1286,7 @@ async function sendQ(){
         if(res.ok&&usableParts.length){
           const chunk=usableParts.map(p=>p.text).join('');
           const fin=data.candidates[0].finishReason;
-          // append search sources if grounding metadata present
-          // NOTE: groundingChunks[].web.uri is a vertexaisearch.cloud.google.com
-          // redirect link, not the real source — the actual domain is in .title.
-          const gm=data.candidates[0].groundingMetadata;
-          let srcNote='';
-          const srcTitles=(gm?.groundingChunks||[]).map(c=>c.web?.title).filter(Boolean);
-          if(srcTitles.length){
-            const uniq=[...new Set(srcTitles.map(t=>String(t).toLowerCase().replace(/^www\./,'')))];
-            srcNote='\n\n**مصادر:** '+uniq.map(h=>'`'+h+'`').join(' • ');
-          }
-          fullReply+=(fullReply?' ':'')+chunk+srcNote;
+          fullReply+=(fullReply?' ':'')+chunk;
           if(fin==='MAX_TOKENS'){attempts=0;continue;}
           const rt=Date.now();removeThinking(tkId);
           const row=renderMsg('ai',fullReply,rt);
