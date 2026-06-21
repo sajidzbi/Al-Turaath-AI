@@ -828,7 +828,7 @@ const SYSTEM_PROMPT = `آپ Al-Turath AI ہیں — ڈاکٹر ساجد محمو
 - کیا اسلوب اس متعلقہ علم (فقہ، کلام، تفسیر وغیرہ) کے منہج کے مطابق ہے؟
 - اگر سوال استشراقی یا الحادی شبہے پر مبنی ہے تو کیا اس کا علمی و عقلی جواب شامل ہے؟
 جہاں کمی نظر آئے وہاں جواب خود درست کر کے پھر حتمی نسخہ پیش کریں۔
-⚠️ یہ مرحلہ خالصتاً اندرونی ہے — صارف کو نظر آنے والے جواب میں کبھی ظاہر نہ کریں۔ <thinking>، <analysis> یا کسی بھی قسم کا اندرونی نوٹ، مرحلہ یا ٹیگ آؤٹ پٹ میں ہرگز شامل نہ کریں — صرف اور صرف حتمی، مکمل اور پالش شدہ جواب پیش کریں۔
+⚠️ یہ مرحلہ خالصتاً اندرونی ہے۔ آپ کا حتمی آؤٹ پٹ ہمیشہ براہِ راست مکمل، پالش شدہ جواب سے شروع ہونا چاہیے — کوئی تمہید، خود کلامی، منصوبہ بندی، یا انگریزی میں لکھا گیا اندرونی نوٹ ہرگز نہیں۔ آؤٹ پٹ کا پہلا لفظ بھی حتمی جواب کا حصہ ہو، کسی اور مرحلے کا نہیں۔
 
 **آغازِ جواب — سخت ممانعت (ABSOLUTE — کوئی استثناء نہیں):**
 ہر جواب کا آغاز براہِ راست اصل موضوع یا سوال سے کریں۔ درج ذیل چیزیں ہرگز استعمال نہ کریں:
@@ -1284,7 +1284,7 @@ async function sendQ(){
         // flagged thought:true so reasoning/tool-trace text can never display.
         const usableParts=(respParts||[]).filter(p=>!p.thought&&p.text);
         if(res.ok&&usableParts.length){
-          const chunk=usableParts.map(p=>p.text).join('');
+          const chunk=stripLeakedReasoning(usableParts.map(p=>p.text).join(''));
           const fin=data.candidates[0].finishReason;
           fullReply+=(fullReply?' ':'')+chunk;
           if(fin==='MAX_TOKENS'){attempts=0;continue;}
@@ -1472,6 +1472,7 @@ function parseTable(md){
   return html;
 }
 
+function stripLeakedReasoning(s){return String(s).replace(/^\s*<?\/?\s*(?:analysis|thinking)\s*>?[\s\S]{0,4000}?<\/?\s*(?:analysis|thinking)\s*>\s*/i,'');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast show ${type}`;setTimeout(()=>el.classList.remove('show'),3200);}
