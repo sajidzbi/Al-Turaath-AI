@@ -1419,8 +1419,11 @@ function inl(t){
   // Arabic-only Unicode block (not Urdu extensions): U+0600–U+06D1 but not U+0679-U+06B9 range typical of Urdu
   t=t.replace(/([\u0600-\u0674\u06BA\u06BE\u06C1\u06C3\u06CC\u06D2\u06D5\uFB50-\uFDFF\uFE70-\uFEFF][\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\u0020\u060C\u061B\u061F\u0640\u06D4\u064B-\u065F]{4,})/g,(m)=>{
     // Simple heuristic: if segment has no Urdu-specific chars it's likely Arabic
-    const urduSpecific=/[\u0679\u067E\u0686\u0688\u0691\u0698\u06AF\u06A9\u06C2\u06C3\u06D3\u06BE\u06C1\u06D0\u06CC\u06F0-\u06F9]/;
-    if(!urduSpecific.test(m)) return '<span class="ar-inline">'+m+'</span>';
+    const urduSpecific=/[\u0679\u067E\u0686\u0688\u0691\u0698\u06AF\u06A9\u06C2\u06C3\u06D3\u06BE\u06C1\u06D0\u06CC\u06D2\u06BA\u06F0-\u06F9]/;
+    // Require 2+ words (a space inside the run): a single bare word with no Urdu
+    // marker letter is overwhelmingly likely to be an ordinary Arabic-origin Urdu
+    // vocabulary word (اعتبار، احتیاط، استعمال...) — not an actual Arabic quotation.
+    if(!urduSpecific.test(m) && /\s/.test(m.trim())) return '<span class="ar-inline">'+m+'</span>';
     return m;
   });
   return t;
