@@ -2,7 +2,7 @@
    App-shell caching only. API calls (generativelanguage.googleapis.com) are
    never intercepted — they always go straight to the network. Bump CACHE_NAME
    on every deploy so returning users automatically get the new shell. */
-const CACHE_NAME = 'al-turath-shell-v8';
+const CACHE_NAME = 'al-turath-shell-v9';
 const SHELL_FILES = [
   './',
   './index.html',
