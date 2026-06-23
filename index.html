@@ -222,6 +222,20 @@ a{text-decoration:none}
 .m-label{font-size:.6rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
 .m-time{font-size:.56rem;color:var(--muted)}
 
+/* ── Share button (per AI answer) ── */
+.m-actions{display:flex;justify-content:flex-end;margin-top:8px}
+.m-share-btn{display:flex;align-items:center;gap:5px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:.66rem;font-family:var(--ui);transition:all .15s;white-space:nowrap}
+.m-share-btn:hover{border-color:var(--gold-b);color:var(--gold-l);background:var(--gold-dim)}
+.m-share-btn svg{width:11px;height:11px;flex-shrink:0}
+
+/* ── Shared-answer install CTA (shown to recipients who open a shared link without the app) ── */
+.install-cta{background:var(--gold-dim);border:1px solid var(--gold-b);border-radius:12px;padding:14px 16px;margin-top:10px}
+.install-cta-text{font-size:.76rem;color:var(--text);line-height:1.9;margin-bottom:11px;direction:rtl;text-align:right;font-family:'JameelNoori','Noto Nastaliq Urdu',serif}
+.install-cta-actions{display:flex;gap:8px;flex-wrap:wrap;direction:rtl}
+.install-cta-btn{padding:7px 14px;border-radius:8px;font-size:.72rem;font-weight:600;border:none;cursor:pointer;white-space:nowrap;font-family:var(--ui);display:inline-flex;align-items:center}
+.install-cta-btn.primary{background:var(--gold);color:#15110a}
+.install-cta-btn.ghost{background:transparent;border:1px solid var(--gold-b);color:var(--gold-l)}
+
 /* ── MESSAGE TEXT ── */
 .m-text{direction:rtl;text-align:justify;font-family:var(--urdu);font-size:var(--chat-fs);font-weight:400;line-height:2.1;color:var(--text);word-break:break-word}
 .m-text strong{color:var(--gold-l);font-weight:600}
@@ -942,6 +956,7 @@ const ERR = {
 /* ══ STATE ══ */
 let apiKeys=[], model='gemini-2.5-flash', isLoading=false, sessions=[], activeId=null;
 let keyRotationIdx=0; // round-robin index
+let _shareStore={}, _shareSeq=0, _lastUserQ=''; // share-feature registry: ai-message-id -> {q,a}
 
 /* ══ KEY ROTATION ══ */
 function getNextKey(){
@@ -999,6 +1014,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     try{sessions=await dbGetAll();sessions.sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));}
     catch(e){const s=localStorage.getItem('at_sessions');if(s)sessions=JSON.parse(s);}
     renderSidebar();
+    renderSharedLanding();
   }catch(e){console.error(e);}
 });
 
@@ -1116,7 +1132,8 @@ async function loadSess(id){
     const ts=s.timestamps?.[i];
     const ds=ts?new Date(ts).toLocaleDateString([],{weekday:'long',day:'numeric',month:'long'}):null;
     if(ds&&ds!==lastDate){addDateSep(ds);lastDate=ds;}
-    renderMsg(h.role==='user'?'user':'ai',h.parts[0].text,ts);
+    const pairedQ=h.role!=='user'?(s.history[i-1]?.parts?.[0]?.text||''):undefined;
+    renderMsg(h.role==='user'?'user':'ai',h.parts[0].text,ts,pairedQ);
   });
   renderSidebar();
   document.getElementById('msgsWrap').scrollTop=9999;
@@ -1290,18 +1307,18 @@ async function sendQ(){
           fullReply+=(fullReply?' ':'')+chunk;
           if(fin==='MAX_TOKENS'){attempts=0;continue;}
           const rt=Date.now();removeThinking(tkId);
-          const row=renderMsg('ai',fullReply,rt);
+          const row=renderMsg('ai',fullReply,rt,q);
           setTimeout(()=>row.scrollIntoView({behavior:'smooth',block:'start'}),60);
           sess.history.push({role:'model',parts:[{text:fullReply}]});
           sess.timestamps.push(rt);sess.updatedAt=rt;
           await saveSess();success=true;
         }else if(res.status===503){if(attempts>=3)break;await delay(2000);}
         else if(res.status===429||res.status===401||res.status===403){markDeadKey(currentKey);break;}
-        else{removeThinking(tkId);renderMsg('ai',ERR.default,Date.now());success=true;}
-      }catch(err){removeThinking(tkId);renderMsg('ai',ERR.network,Date.now());success=true;}
+        else{removeThinking(tkId);renderMsg('ai',ERR.default,Date.now(),q);success=true;}
+      }catch(err){removeThinking(tkId);renderMsg('ai',ERR.network,Date.now(),q);success=true;}
     }
   }
-  if(!success){removeThinking(tkId);renderMsg('ai',fullReply||ERR.quota,Date.now());}
+  if(!success){removeThinking(tkId);renderMsg('ai',fullReply||ERR.quota,Date.now(),q);}
   isLoading=false;updateKeyStatus();
 }
 
@@ -1319,13 +1336,24 @@ function detectLang(text){
   return'urdu'; // Urdu font handles both Urdu & Arabic RTL
 }
 
-function renderMsg(role,text,ts){
+function renderMsg(role,text,ts,question){
   const wrap=document.getElementById('msgsWrap'),msgs=document.getElementById('messages');
   const row=document.createElement('div');row.className=`msg-row ${role==='ai'?'ai-row':'user-row'}`;
   const timeStr=ts?new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
   const lang=role==='ai'?detectLang(text):'urdu';
   const fontClass=lang==='english'?'is-english':'';
   const dirAttr=lang==='english'?'ltr':'rtl';
+  let shareBtnHtml='';
+  if(role==='ai'){
+    const shareId='sh'+(++_shareSeq);
+    _shareStore[shareId]={q:(question!==undefined?question:_lastUserQ)||'',a:text};
+    shareBtnHtml=`<div class="m-actions">
+      <button class="m-share-btn" onclick="shareAnswer('${shareId}')" title="یہ جواب شیئر کریں">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 8l5-5 5 5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+        شیئر کریں
+      </button>
+    </div>`;
+  }
   row.innerHTML=`
     <div class="msg-inner">
       <div class="m-avatar">${role==='ai'?`<svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`:'👤'}</div>
@@ -1335,12 +1363,112 @@ function renderMsg(role,text,ts){
           ${timeStr?`<span class="m-time">${timeStr}</span>`:''}
         </div>
         <div class="m-text ${fontClass}" dir="${dirAttr}">${fmtMd(text)}</div>
+        ${shareBtnHtml}
       </div>
     </div>`;
   msgs.appendChild(row);
-  if(role==='user')wrap.scrollTop=wrap.scrollHeight;
+  if(role==='user'){wrap.scrollTop=wrap.scrollHeight;_lastUserQ=text;}
   return row;
 }
+
+/* ══════════════════════ SHARE FEATURE ══════════════════════
+   A shared answer travels entirely inside the URL — no backend/database
+   needed. Whoever opens the link gets this same index.html:
+     • if it's running standalone (already installed) → just shows the answer
+     • if it's a plain browser tab (no app yet) → shows the answer AND an
+       install CTA (button + link to the install-guide PDF)
+   Q/A is UTF-8 → base64url encoded (not encodeURIComponent) because Urdu/
+   Arabic text under percent-encoding balloons ~6x; base64 keeps links short
+   enough to paste anywhere (WhatsApp, Telegram, SMS, email).
+   ═══════════════════════════════════════════════════════════════════════ */
+const APP_HOME_URL='https://sajidzbi.github.io/Al-Turaath-AI/';
+const INSTALL_GUIDE_URL='./Al-Turath-AI-Installation_Guide.pdf'; // ⚠ upload this PDF next to index.html in the repo
+const MAX_SHARE_LEN=5000; // answer characters before truncation (keeps the link a manageable size)
+
+function utf8ToB64url(str){
+  const bytes=new TextEncoder().encode(str);
+  let bin='';for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlToUtf8(str){
+  str=str.replace(/-/g,'+').replace(/_/g,'/');while(str.length%4)str+='=';
+  const bin=atob(str);const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function smartTruncate(s,max){
+  if(s.length<=max)return{text:s,truncated:false};
+  let cut=s.lastIndexOf('\n\n',max);
+  if(cut<max*0.5)cut=max; // no good paragraph break — just cut
+  return{text:s.slice(0,cut),truncated:true};
+}
+
+function shareAnswer(id){
+  const item=_shareStore[id];
+  if(!item){toast('شیئر نہیں ہو سکا','err');return;}
+  const{text:a,truncated}=smartTruncate(item.a,MAX_SHARE_LEN);
+  const payload={q:item.q||'',a,truncated};
+  const shareUrl=location.origin+location.pathname+'#share='+utf8ToB64url(JSON.stringify(payload));
+  const shareText=(item.q?('سوال: '+item.q.slice(0,140)+(item.q.length>140?'…':''))+'\n\n':'')+'Al-Turath AI کا جواب دیکھیں:';
+  if(navigator.share){
+    navigator.share({title:'Al-Turath AI',text:shareText,url:shareUrl}).catch(()=>{});
+  }else if(navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(shareUrl)
+      .then(()=>toast('شیئر لنک کاپی ہوگیا ✓ — اب کسی کو بھی بھیج دیں','ok'))
+      .catch(()=>fallbackCopy(shareUrl));
+  }else{
+    fallbackCopy(shareUrl);
+  }
+}
+function fallbackCopy(url){
+  try{
+    const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    toast('شیئر لنک کاپی ہوگیا ✓','ok');
+  }catch(e){prompt('یہ لنک کاپی کریں:',url);}
+}
+
+function sharedInstallBannerHtml(){
+  return`<div class="msg-row ai-row">
+    <div class="msg-inner"><div class="m-content" style="width:100%">
+      <div class="install-cta">
+        <div class="install-cta-text">📲 یہ جواب <strong>Al-Turath AI</strong> نے دیا ہے — مکمل ایپ اپنے فون میں انسٹال کریں اور خود سوال پوچھیں۔</div>
+        <div class="install-cta-actions">
+          <button class="install-cta-btn primary" onclick="sharedInstallClick()">ایپ انسٹال کریں</button>
+          <a class="install-cta-btn ghost" href="${INSTALL_GUIDE_URL}" target="_blank" rel="noopener">انسٹال کا طریقہ (PDF)</a>
+        </div>
+      </div>
+    </div></div>
+  </div>`;
+}
+async function sharedInstallClick(){
+  if(_deferredInstallPrompt){
+    _deferredInstallPrompt.prompt();
+    const choice=await _deferredInstallPrompt.userChoice;
+    if(choice.outcome==='accepted')localStorage.setItem(PWA_INSTALLED_KEY,'1');
+    _deferredInstallPrompt=null;
+  }else if(pwaIsIOS()){
+    toast('نیچے Share آئیکن پر ٹیپ کریں، پھر "Add to Home Screen" منتخب کریں','');
+  }else{
+    toast('براؤزر کے مینیو (⋮) سے "Add to Home Screen" یا "Install App" منتخب کریں','');
+  }
+}
+
+function renderSharedLanding(){
+  if(!location.hash.startsWith('#share='))return;
+  let payload;
+  try{payload=JSON.parse(b64urlToUtf8(location.hash.slice(7)));}catch(e){return;}
+  if(!payload||!payload.a)return;
+  document.getElementById('welcome').style.display='none';
+  if(payload.q)renderMsg('user',payload.q,null);
+  let answerText=payload.a;
+  if(payload.truncated)answerText+='\n\n(یہ جواب طویل ہونے کی وجہ سے جزوی طور پر دکھایا گیا ہے — مکمل جواب کے لیے ایپ میں دوبارہ یہی سوال پوچھیں)';
+  const row=renderMsg('ai',answerText,null,payload.q||'');
+  if(!pwaIsStandalone())row.insertAdjacentHTML('afterend',sharedInstallBannerHtml());
+  history.replaceState(null,'',location.pathname);
+  setTimeout(()=>{document.getElementById('msgsWrap').scrollTop=0;},30);
+}
+window.addEventListener('hashchange',renderSharedLanding);
 
 function addThinking(){
   const id='tk'+Date.now();const msgs=document.getElementById('messages');
