@@ -1014,7 +1014,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     try{sessions=await dbGetAll();sessions.sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));}
     catch(e){const s=localStorage.getItem('at_sessions');if(s)sessions=JSON.parse(s);}
     renderSidebar();
-    renderSharedLanding();
+    // Check if this page was opened with a shared answer link (#s=code)
+    if(location.hash.startsWith('#s='))await renderSharedLanding();
   }catch(e){console.error(e);}
 });
 
@@ -1371,61 +1372,108 @@ function renderMsg(role,text,ts,question){
   return row;
 }
 
-/* ══════════════════════ SHARE FEATURE ══════════════════════
-   A shared answer travels entirely inside the URL — no backend/database
-   needed. Whoever opens the link gets this same index.html:
-     • if it's running standalone (already installed) → just shows the answer
-     • if it's a plain browser tab (no app yet) → shows the answer AND an
-       install CTA (button + link to the install-guide PDF)
-   Q/A is UTF-8 → base64url encoded (not encodeURIComponent) because Urdu/
-   Arabic text under percent-encoding balloons ~6x; base64 keeps links short
-   enough to paste anywhere (WhatsApp, Telegram, SMS, email).
-   ═══════════════════════════════════════════════════════════════════════ */
-const APP_HOME_URL='https://sajidzbi.github.io/Al-Turaath-AI/';
-const INSTALL_GUIDE_URL='./Al-Turath-AI-Installation_Guide.pdf'; // ⚠ upload this PDF next to index.html in the repo
-const MAX_SHARE_LEN=5000; // answer characters before truncation (keeps the link a manageable size)
+/* ══════════════════════ SHARE FEATURE (SHORT-CODE REGISTRY) ══════════════════════
+   بجائے لمبے base64 URL کے، ہر جواب کو ایک مختصر code دیتے ہیں (مثلاً sh_a1b2c3d4)
+   Q/A اور code کو IndexedDB میں محفوظ رکھتے ہیں
+   URL: https://sajidzbi.github.io/Al-Turaath-AI/#s=a1b2c3d4 (بہت مختصر!)
+   ══════════════════════════════════════════════════════════════════════════════ */
 
-function utf8ToB64url(str){
-  const bytes=new TextEncoder().encode(str);
-  let bin='';for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const SHARE_STORE='shares'; // IndexedDB store name
+const APP_HOME_URL='https://sajidzbi.github.io/Al-Turaath-AI/';
+const INSTALL_GUIDE_URL='./Al-Turath-AI-Installation_Guide.pdf';
+let _shareDb=null;
+
+function genShareCode(){
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code='sh_';
+  for(let i=0;i<8;i++)code+=chars.charAt(Math.floor(Math.random()*chars.length));
+  return code;
 }
-function b64urlToUtf8(str){
-  str=str.replace(/-/g,'+').replace(/_/g,'/');while(str.length%4)str+='=';
-  const bin=atob(str);const bytes=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+
+async function openShareDb(){
+  if(_shareDb)return _shareDb;
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open('AlTurathShare',1);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(SHARE_STORE)){
+        const store=db.createObjectStore(SHARE_STORE,{keyPath:'code'});
+        store.createIndex('createdAt','createdAt');
+      }
+    };
+    req.onsuccess=e=>{_shareDb=e.target.result;res(_shareDb);};
+    req.onerror=()=>rej(new Error('Failed to open share DB'));
+  });
 }
+
+async function saveShare(q,a,truncated){
+  try{
+    const db=await openShareDb();
+    const code=genShareCode();
+    const item={code,q,a,truncated,createdAt:Date.now()};
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(SHARE_STORE,'readwrite');
+      const req=tx.objectStore(SHARE_STORE).add(item);
+      tx.oncomplete=()=>res();
+      tx.onerror=()=>rej(tx.error);
+    });
+    return code;
+  }catch(e){console.error('Share save error:',e);return null;}
+}
+
+async function loadShare(code){
+  try{
+    const db=await openShareDb();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction(SHARE_STORE,'readonly');
+      const req=tx.objectStore(SHARE_STORE).get(code);
+      req.onsuccess=()=>res(req.result||null);
+      req.onerror=()=>rej(req.error);
+    });
+  }catch(e){console.error('Share load error:',e);return null;}
+}
+
 function smartTruncate(s,max){
   if(s.length<=max)return{text:s,truncated:false};
   let cut=s.lastIndexOf('\n\n',max);
-  if(cut<max*0.5)cut=max; // no good paragraph break — just cut
+  if(cut<max*0.5)cut=max;
   return{text:s.slice(0,cut),truncated:true};
 }
 
-function shareAnswer(id){
+async function shareAnswer(id){
   const item=_shareStore[id];
   if(!item){toast('شیئر نہیں ہو سکا','err');return;}
-  const{text:a,truncated}=smartTruncate(item.a,MAX_SHARE_LEN);
-  const payload={q:item.q||'',a,truncated};
-  const shareUrl=location.origin+location.pathname+'#share='+utf8ToB64url(JSON.stringify(payload));
-  const shareText=(item.q?('سوال: '+item.q.slice(0,140)+(item.q.length>140?'…':''))+'\n\n':'')+'Al-Turath AI کا جواب دیکھیں:';
+  const{text:a,truncated}=smartTruncate(item.a,8000);
+  const code=await saveShare(item.q||'',a,truncated);
+  if(!code){toast('شیئر محفوظ نہیں ہو سکا','err');return;}
+  
+  const shareUrl=location.origin+location.pathname+'#s='+code;
+  const shareText=(item.q?('سوال: '+item.q.slice(0,100)+(item.q.length>100?'…':''))+'\n\n':'')+'Al-Turath AI کا جواب دیکھیں:';
+  
   if(navigator.share){
-    navigator.share({title:'Al-Turath AI',text:shareText,url:shareUrl}).catch(()=>{});
+    navigator.share({title:'Al-Turath AI',text:shareText,url:shareUrl})
+      .then(()=>toast('لنک شیئر ہوگیا ✓','ok'))
+      .catch(()=>{});
   }else if(navigator.clipboard?.writeText){
     navigator.clipboard.writeText(shareUrl)
-      .then(()=>toast('شیئر لنک کاپی ہوگیا ✓ — اب کسی کو بھی بھیج دیں','ok'))
+      .then(()=>toast('لنک کاپی ہو گیا ✓','ok'))
       .catch(()=>fallbackCopy(shareUrl));
   }else{
     fallbackCopy(shareUrl);
   }
 }
+
 function fallbackCopy(url){
   try{
-    const ta=document.createElement('textarea');ta.value=url;ta.style.position='fixed';ta.style.opacity='0';
-    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
-    toast('شیئر لنک کاپی ہوگیا ✓','ok');
-  }catch(e){prompt('یہ لنک کاپی کریں:',url);}
+    const ta=document.createElement('textarea');
+    ta.value=url;
+    ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('لنک کاپی ہوگیا ✓','ok');
+  }catch(e){alert('لنک: '+url);}
 }
 
 function sharedInstallBannerHtml(){
@@ -1441,6 +1489,7 @@ function sharedInstallBannerHtml(){
     </div></div>
   </div>`;
 }
+
 async function sharedInstallClick(){
   if(_deferredInstallPrompt){
     _deferredInstallPrompt.prompt();
@@ -1454,21 +1503,46 @@ async function sharedInstallClick(){
   }
 }
 
-function renderSharedLanding(){
-  if(!location.hash.startsWith('#share='))return;
-  let payload;
-  try{payload=JSON.parse(b64urlToUtf8(location.hash.slice(7)));}catch(e){return;}
-  if(!payload||!payload.a)return;
-  document.getElementById('welcome').style.display='none';
-  if(payload.q)renderMsg('user',payload.q,null);
-  let answerText=payload.a;
-  if(payload.truncated)answerText+='\n\n(یہ جواب طویل ہونے کی وجہ سے جزوی طور پر دکھایا گیا ہے — مکمل جواب کے لیے ایپ میں دوبارہ یہی سوال پوچھیں)';
-  const row=renderMsg('ai',answerText,null,payload.q||'');
-  if(!pwaIsStandalone())row.insertAdjacentHTML('afterend',sharedInstallBannerHtml());
-  history.replaceState(null,'',location.pathname);
-  setTimeout(()=>{document.getElementById('msgsWrap').scrollTop=0;},30);
+async function renderSharedLanding(){
+  const hash=location.hash;
+  if(!hash.startsWith('#s='))return;
+  
+  const code=hash.slice(3); // remove '#s='
+  if(!code)return;
+  
+  const item=await loadShare(code);
+  if(!item)return;
+  
+  // ہنٹ: welcome اور input کو چھپا دو
+  const welcome=document.getElementById('welcome');
+  if(welcome)welcome.style.display='none';
+  
+  // سوال رینڈر کرو
+  if(item.q){
+    const userRow=renderMsg('user',item.q,null);
+    userRow.style.opacity='0.85'; // shared messages کو تھوڑا fade کریں
+  }
+  
+  // جواب رینڈر کرو
+  let answerText=item.a;
+  if(item.truncated)answerText+='\n\n📌 یہ جواب مختصر شدہ ہے — مکمل جواب کے لیے ایپ میں یہی سوال پھر سے پوچھیں۔';
+  
+  const answerRow=renderMsg('ai',answerText,null,item.q||'');
+  
+  // اگر ایپ انسٹال نہیں ہے تو install بینر شامل کریں
+  if(!pwaIsStandalone()){
+    answerRow.insertAdjacentHTML('afterend',sharedInstallBannerHtml());
+  }
+  
+  // صفحہ ٹاپ پر جاؤ
+  setTimeout(()=>{
+    const wrap=document.getElementById('msgsWrap');
+    if(wrap)wrap.scrollTop=0;
+  },50);
 }
-window.addEventListener('hashchange',renderSharedLanding);
+
+// جب hash تبدیل ہو تو دوبارہ رینڈر کریں
+window.addEventListener('hashchange',()=>{renderSharedLanding();});
 
 function addThinking(){
   const id='tk'+Date.now();const msgs=document.getElementById('messages');
