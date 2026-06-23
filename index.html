@@ -663,6 +663,16 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
         <option value="gemini-1.5-pro">Al-Turath 1.5 Pro ✦ Search</option>
       </select>
     </div>
+    <div class="f-row">
+      <label>فقہی مذہب (Fiqh Madhab)</label>
+      <select id="fiqqhSelect" onchange="setFiqhPreference(this.value)">
+        <option value="hanafi">حنفی (Hanafi) — پاکستان میں سب سے عام</option>
+        <option value="maliki">مالکی (Maliki)</option>
+        <option value="shafi">شافعی (Shafi'i)</option>
+        <option value="hanbali">حنبلی (Hanbali)</option>
+        <option value="zahiri">ظاہری (Zahiri)</option>
+      </select>
+    </div>
     <hr class="f-divider">
     <div class="f-row">
       <label>Interface Theme</label>
@@ -958,6 +968,12 @@ let apiKeys=[], model='gemini-2.5-flash', isLoading=false, sessions=[], activeId
 let keyRotationIdx=0; // round-robin index
 let _shareStore={}, _shareSeq=0, _lastUserQ=''; // share-feature registry: ai-message-id -> {q,a}
 
+/* ══ API QUOTA & FIQH SYSTEM ══ */
+let apiQuota={};  // {key: {flash25: {used, date}, flash31: {used, date}}}
+let userFiqh='hanafi'; // user's preferred fiqh madhab
+let dailyQuota={FLASH25:20, FLASH31:500}; // Flash 2.5: 20/day, Flash 3.1: 500/day
+let modelMap={'gemini-2.5-flash':'FLASH25', 'gemini-2.5-flash-lite':'FLASH31'};
+
 /* ══ KEY ROTATION ══ */
 function getNextKey(){
   const live=apiKeys.filter(k=>k&&k.key&&!k.dead);
@@ -1013,6 +1029,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
     applySbFont(sbfs);
     try{sessions=await dbGetAll();sessions.sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));}
     catch(e){const s=localStorage.getItem('at_sessions');if(s)sessions=JSON.parse(s);}
+    restoreQuota(); // Restore API quota tracking
+    userFiqh=getFiqhPreference(); // Load user's fiqh preference
     renderSidebar();
     // Check if this page was opened with a shared answer link (#s=code)
     if(location.hash.startsWith('#s='))await renderSharedLanding();
@@ -1215,11 +1233,20 @@ function saveSettings(){
   apiKeys.forEach(k=>k.dead=false);
   localStorage.setItem('at_keys',JSON.stringify(apiKeys));
   model=document.getElementById('modelSelect').value;localStorage.setItem('at_model',model);
+  const fiqqhSel=document.getElementById('fiqqhSelect');if(fiqqhSel)userFiqh=fiqqhSel.value;
+  localStorage.setItem('at_fiqh',userFiqh);
   updateKeyStatus();renderKeyRows();closeModal('settingsModal');toast('Settings saved ✓','ok');
 }
 
 /* ══ MODALS ══ */
-function openModal(id){document.getElementById(id).classList.add('open');}
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  // Initialize fiqh selector
+  if(id==='settingsModal'){
+    const fiqqhSel=document.getElementById('fiqqhSelect');
+    if(fiqqhSel)fiqqhSel.value=userFiqh;
+  }
+}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function overlayClick(e,id){if(e.target===e.currentTarget)closeModal(id);}
 
@@ -1232,6 +1259,13 @@ async function sendQ(){
   const firstKey=getNextKey();
   if(!firstKey){openModal('settingsModal');toast('Please add an API Key first','err');return;}
   const ta=document.getElementById('qInput');const q=ta.value.trim();if(!q)return;
+  
+  /* ── Check for sectarian questions ── */
+  if(isSectarianQuestion(q)){
+    toast('معاف کیجیے، فرقہ وارانہ سوالات کا جواب نہیں دیا جاتا۔ براہ مہربانی کوئی اور سوال پوچھیں۔','err');
+    return;
+  }
+  
   ta.value='';autoResize(ta);
   isLoading=true;document.getElementById('sendBtn').disabled=true;
   document.getElementById('welcome').style.display='none';
@@ -1252,6 +1286,32 @@ async function sendQ(){
   const tkId=addThinking();
   let success=false,fullReply='';
 
+  /* ── Analyze question complexity (decide: Flash 2.5 vs 3.1) ── */
+  const analysis=await analyzeQuestionComplexity(q);
+  let preferredModel='gemini-2.5-flash'; // default to best model
+  
+  if(analysis.complexity==='simple'){
+    // Simple question → try 3.1 first (cheaper, 500/day)
+    // Check if 3.1 has quota, if yes use it
+    if(hasQuota(firstKey,'FLASH31')){preferredModel='gemini-2.5-flash-lite';}
+    else if(!hasQuota(firstKey,'FLASH25')){
+      toast('آج کی حد ختم ہو گئی ہے۔ کل دوبارہ کوشش کریں۔','err');
+      isLoading=false;document.getElementById('sendBtn').disabled=false;
+      removeThinking(tkId);return;
+    }
+  }else{
+    // Complex/moderate → use Flash 2.5 (20/day, better quality)
+    if(!hasQuota(firstKey,'FLASH25')){
+      // Flash 2.5 limit reached, try 3.1
+      if(!hasQuota(firstKey,'FLASH31')){
+        toast('آج کی حد ختم ہو گئی ہے۔ کل دوبارہ کوشش کریں۔','err');
+        isLoading=false;document.getElementById('sendBtn').disabled=false;
+        removeThinking(tkId);return;
+      }
+      preferredModel='gemini-2.5-flash-lite';
+    }
+  }
+
   // ── Smart Source Router: classify domain → targeted search hint ──
   const qDomain = classifyQuestion(q);
   const searchSrc = buildSearchInstruction(q, qDomain);
@@ -1260,7 +1320,13 @@ async function sendQ(){
   const ilhadExtra = qDomain === 'ilhad'
     ? `\nالحاد کے رد کے لیے سب سے پہلے Hamza Andreas Tzortzis کی کتاب "The Divine Reality: God, Islam & The Mirage of Atheism" سے استفادہ کریں — یہ اس موضوع کا اہم ترین مستند مرجع ہے۔ اس کتاب کے دلائل، chapters اور arguments کو بنیاد بنا کر جواب دیں۔ پھر site:iera.org اور site:hamzatzortzis.com پر مزید مواد تلاش کریں۔`
     : '';
-  const domainHint = `\n\n[SEARCH HINT — ${qDomain.toUpperCase()}]: لازمی: پہلے ${searchSrc} پر تلاش کریں — چاہے جواب پہلے سے معلوم محسوس ہو، تلاش کے بغیر جواب نہ دیں۔ مکتبہ شاملہ اور الدرر السنیة پر تمام علوم کی کتابیں موجود ہیں — وہاں سے مکمل تحقیقی مواد نکالیں۔ اگر وہاں نہ ملے تو دوسری مستند اہلِ سنت سائٹس پر web search کریں۔ ⚠️ جواب میں کسی ویب سائٹ کا URL یا پتہ ہرگز نہ لکھیں — صرف کتاب، مصنف اور باب/رقم کا حوالہ دیں۔${ilhadExtra}`;
+  
+  /* ── Add Fiqh instruction ── */
+  const fiqqhInst=userFiqh==='hanafi'
+    ? '\n\nتمام فقہی مسائل کے جوابات Fiqh Hanafi کے مطابق دیں — یہ ہی معیاری ہے۔ اگر کوئی کسی دوسری fiqh کا سوال کرے تو پھر اس کی فقہ کے مطابق۔'
+    : `\n\nفقہی سوالات ${userFiqh.toUpperCase()} کے مطابق جوابات دیں۔`;
+  
+  const domainHint = `\n\n[SEARCH HINT — ${qDomain.toUpperCase()}]: لازمی: پہلے ${searchSrc} پر تلاش کریں — چاہے جواب پہلے سے معلوم محسوس ہو، تلاش کے بغیر جواب نہ دیں۔ مکتبہ شاملہ اور الدرر السنیة پر تمام علوم کی کتابیں موجود ہیں — وہاں سے مکمل تحقیقی مواد نکالیں۔ اگر وہاں نہ ملے تو دوسری مستند اہلِ سنت سائٹس پر web search کریں۔ ⚠️ جواب میں کسی ویب سائٹ کا URL یا پتہ ہرگز نہ لکھیں — صرف کتاب، مصنف اور باب/رقم کا حوالہ دیں۔${ilhadExtra}${fiqqhInst}`;
   const ragSystemPrompt = SYSTEM_PROMPT + domainHint;
 
   // Get all live keys for fallback
@@ -1270,7 +1336,8 @@ async function sendQ(){
 
   for(let ki=0;ki<orderedKeys.length&&!success;ki++){
     const currentKey=orderedKeys[ki];
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentKey}`;
+    const currentModel=preferredModel;
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${currentKey}`;
     let attempts=0;
     while(attempts<3&&!success){
       attempts++;
@@ -1281,11 +1348,11 @@ async function sendQ(){
       }
       // Google Search Grounding — Gemini searches darulifta.info,
       // shamela.ws, dorar.net and other Islamic sources automatically
-      const useSearch=model==='gemini-2.5-flash'||model==='gemini-2.5-flash-lite'||model==='gemini-1.5-pro';
+      const useSearch=currentModel==='gemini-2.5-flash'||currentModel==='gemini-2.5-flash-lite'||currentModel==='gemini-1.5-pro';
       // Gemini 2.5 models think by default — thinkingBudget:0 disables it outright
       // so the model's internal reasoning/tool-trace can never leak into the chat.
       // gemini-1.5-pro has no thinking feature at all, so this is omitted for it.
-      const supportsThinkingConfig=model==='gemini-2.5-flash'||model==='gemini-2.5-flash-lite';
+      const supportsThinkingConfig=currentModel==='gemini-2.5-flash'||currentModel==='gemini-2.5-flash-lite';
       const body={
         system_instruction:{parts:[{text:ragSystemPrompt}]},
         contents,
@@ -1306,6 +1373,11 @@ async function sendQ(){
           const chunk=stripLeakedReasoning(usableParts.map(p=>p.text).join(''));
           const fin=data.candidates[0].finishReason;
           fullReply+=(fullReply?' ':'')+chunk;
+          
+          /* ── Consume quota on first successful response ── */
+          const modelType=modelMap[currentModel]||'FLASH25';
+          consumeQuota(currentKey,modelType);
+          
           if(fin==='MAX_TOKENS'){attempts=0;continue;}
           const rt=Date.now();removeThinking(tkId);
           const row=renderMsg('ai',fullReply,rt,q);
@@ -1543,6 +1615,74 @@ async function renderSharedLanding(){
 
 // جب hash تبدیل ہو تو دوبارہ رینڈر کریں
 window.addEventListener('hashchange',()=>{renderSharedLanding();});
+
+function getQuotaKey(key){
+  if(!apiQuota[key]){
+    apiQuota[key]={flash25:{used:0,date:new Date().toDateString()},flash31:{used:0,date:new Date().toDateString()}};
+  }
+  const today=new Date().toDateString();
+  if(apiQuota[key].flash25.date!==today){apiQuota[key].flash25={used:0,date:today};}
+  if(apiQuota[key].flash31.date!==today){apiQuota[key].flash31={used:0,date:today};}
+  return apiQuota[key];
+}
+
+function hasQuota(key,modelType){
+  const quota=getQuotaKey(key);
+  const usage=modelType==='FLASH25'?quota.flash25.used:quota.flash31.used;
+  const limit=modelType==='FLASH25'?dailyQuota.FLASH25:dailyQuota.FLASH31;
+  return usage<limit;
+}
+
+function consumeQuota(key,modelType){
+  const quota=getQuotaKey(key);
+  if(modelType==='FLASH25')quota.flash25.used++;
+  else quota.flash31.used++;
+  localStorage.setItem('at_quota',JSON.stringify(apiQuota));
+}
+
+function restoreQuota(){
+  const saved=localStorage.getItem('at_quota');
+  if(saved)try{apiQuota=JSON.parse(saved);}catch(e){}
+}
+
+/* Question Classifier: determine complexity + assess for sectarian issues */
+async function analyzeQuestionComplexity(q){
+  try{
+    const checkResp=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key='+apiKeys[0]?.key,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        system_instruction:{parts:[{text:'آپ ایک سوال کا تجزیہ کریں۔ جواب ہمیشہ یہ format میں دیں: {complexity: "simple"|"moderate"|"complex", isSectarian: boolean, reason: "string"}'}]},
+        contents:[{role:'user',parts:[{text:`سوال: "${q}"\n\nجواب صرف JSON میں دیں، اور کچھ نہیں۔`}]}],
+        generationConfig:{temperature:0.3,maxOutputTokens:200}
+      })
+    });
+    const result=await checkResp.json();
+    const text=result.candidates?.[0]?.content?.parts?.[0]?.text||'{}';
+    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    return{complexity:parsed.complexity||'moderate',isSectarian:parsed.isSectarian||false,reason:parsed.reason||''};
+  }catch(e){
+    console.warn('Question analysis failed:',e);
+    return{complexity:'moderate',isSectarian:false,reason:''};
+  }
+}
+
+/* Sectarian Question Filter */
+function isSectarianQuestion(q){
+  const sectarianKeywords=['شیعہ','شیعیت','قادیانی','احمدیہ','بہائی','علوی','علوی ہے','درزی','ظاہری','مرجئی','معتزلی اصول'];
+  const toLowerCase=q.toLowerCase();
+  return sectarianKeywords.some(kw=>toLowerCase.includes(kw));
+}
+
+function getFiqhPreference(){
+  const saved=localStorage.getItem('at_fiqh');
+  return saved||'hanafi';
+}
+
+function setFiqhPreference(fiqh){
+  userFiqh=fiqh;
+  localStorage.setItem('at_fiqh',fiqh);
+}
 
 function addThinking(){
   const id='tk'+Date.now();const msgs=document.getElementById('messages');
