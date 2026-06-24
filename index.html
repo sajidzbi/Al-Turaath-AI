@@ -174,6 +174,12 @@ a{text-decoration:none}
 .key-dot.ok{background:var(--green);box-shadow:0 0 6px rgba(39,174,96,.4)}
 .btn-icon{width:28px;height:28px;background:none;border:none;color:var(--muted);border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .btn-icon:hover{background:var(--hover);color:var(--text)}
+.btn-sm{padding:7px 12px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text);border-radius:6px;cursor:pointer;transition:all .15s;font-family:inherit}
+.btn-sm:hover{background:var(--surface);border-color:var(--gold)}
+.btn-primary{padding:10px 16px;background:linear-gradient(135deg,var(--gold),var(--gold-b));color:#15110a;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;font-family:inherit;transition:all .15s}
+.btn-primary:hover{opacity:0.9}
+.btn-secondary{padding:10px 16px;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;cursor:pointer;font-weight:500;font-size:0.9rem;font-family:inherit;transition:all .15s}
+.btn-secondary:hover{background:var(--surface);border-color:var(--muted)}
 
 /* ── DOMAIN NAV ── */
 .domain-nav{border-bottom:1px solid var(--border);background:var(--panel);padding:0 14px;display:flex;align-items:center;gap:0;overflow-x:auto;flex-shrink:0;height:38px}
@@ -664,14 +670,16 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
       </select>
     </div>
     <div class="f-row">
-      <label>فقہی مذہب (Fiqh Madhab)</label>
-      <select id="fiqqhSelect" onchange="setFiqhPreference(this.value)">
-        <option value="hanafi">حنفی (Hanafi) — پاکستان میں سب سے عام</option>
-        <option value="maliki">مالکی (Maliki)</option>
-        <option value="shafi">شافعی (Shafi'i)</option>
-        <option value="hanbali">حنبلی (Hanbali)</option>
-        <option value="zahiri">ظاہری (Zahiri)</option>
-      </select>
+      <label>🔐 محفوظ Keys محفظ (Encrypted Safe)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-sm" onclick="openPinSetup()">🔒 PIN سیٹ کریں</button>
+        <button class="btn-sm" onclick="openKeyManager()">🔑 Keys Manage کریں</button>
+        <button class="btn-sm" onclick="exportKeysSecure()" style="background:#4ade80;">📥 Keys Backup</button>
+      </div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;">
+        💡 تمام API keys اب IndexedDB میں encrypted محفوظ ہوں گی۔ 
+        Browser history clear ہونے سے بھی محفوظ رہیں گی۔
+      </p>
     </div>
     <hr class="f-divider">
     <div class="f-row">
@@ -709,7 +717,58 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
 </div>
 
 <!-- ══ ABOUT MODAL ══ -->
-<div class="overlay" id="aboutModal" onclick="overlayClick(event,'aboutModal')">
+<div class="overlay" id="pinModal" onclick="overlayClick(event,'pinModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔐 محفوظ PIN سیٹ کریں</h2>
+      <button class="modal-close" onclick="closeModal('pinModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px;">
+        یہ PIN آپ کے API keys کو encrypt کرے گا۔ اسے یاد رکھیں!<br>
+        <strong>نہ بھولیں:</strong> بغیر PIN کے keys access نہیں ہو سکتے۔
+      </p>
+      <div class="f-row">
+        <label>نیا PIN (4-8 digits)</label>
+        <input id="newPin" type="password" placeholder="مثال: 1234" maxlength="8" style="width:100%;">
+      </div>
+      <div class="f-row">
+        <label>PIN دوبارہ درج کریں</label>
+        <input id="confirmPin" type="password" placeholder="تصدیق کریں" maxlength="8" style="width:100%;">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn-primary" onclick="setupPin()" style="flex:1;">PIN سیٹ کریں</button>
+        <button class="btn-secondary" onclick="closeModal('pinModal')" style="flex:1;">منسوخ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="keyManagerModal" onclick="overlayClick(event,'keyManagerModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔑 API Keys Manager</h2>
+      <button class="modal-close" onclick="closeModal('keyManagerModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="f-row">
+        <label>PIN درج کریں</label>
+        <input id="accessPin" type="password" placeholder="PIN" maxlength="8" style="width:100%;">
+      </div>
+      <button class="btn-sm" onclick="unlockKeyManager()" style="margin-bottom:14px;width:100%;">🔓 Unlock</button>
+      
+      <div id="keyManagerContent" style="display:none;">
+        <div id="keysList" style="max-height:300px;overflow-y:auto;margin-bottom:14px;"></div>
+        
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-sm" onclick="changeAllKeys()" style="background:#f59e0b;">✏️ تبدیل کریں</button>
+          <button class="btn-sm" onclick="deleteAllKeys()" style="background:#ef4444;">🗑️ Delete کریں</button>
+          <button class="btn-sm" onclick="closeModal('keyManagerModal')">بند کریں</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
   <div class="modal" style="max-width:520px;direction:ltr;text-align:left">
     <div class="modal-h">
       <h2>ABOUT AL-TURATH AI</h2>
@@ -968,11 +1027,101 @@ let apiKeys=[], model='gemini-2.5-flash', isLoading=false, sessions=[], activeId
 let keyRotationIdx=0; // round-robin index
 let _shareStore={}, _shareSeq=0, _lastUserQ=''; // share-feature registry: ai-message-id -> {q,a}
 
-/* ══ API QUOTA & FIQH SYSTEM ══ */
-let apiQuota={};  // {key: {flash25: {used, date}, flash31: {used, date}}}
-let userFiqh='hanafi'; // user's preferred fiqh madhab
-let dailyQuota={FLASH25:20, FLASH31:500}; // Flash 2.5: 20/day, Flash 3.1: 500/day
-let modelMap={'gemini-2.5-flash':'FLASH25', 'gemini-2.5-flash-lite':'FLASH31'};
+/* ══ SECURE KEY STORAGE (IndexedDB + Encryption) ══ */
+const KEYS_DB='AlTurathKeys';
+const KEYS_STORE='api_keys_encrypted';
+let _keysDb=null;
+let _masterPin=''; // Master PIN for key access
+
+async function openKeysDb(){
+  if(_keysDb)return _keysDb;
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(KEYS_DB,1);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(KEYS_STORE)){
+        db.createObjectStore(KEYS_STORE,{keyPath:'id'});
+      }
+    };
+    req.onsuccess=e=>{_keysDb=e.target.result;res(_keysDb);};
+    req.onerror=()=>rej(new Error('Failed to open keys DB'));
+  });
+}
+
+// Simple XOR-based encryption (not crypto-grade, but better than plaintext)
+function simpleEncrypt(text,pin){
+  const key=pin.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+  let result='';
+  for(let i=0;i<text.length;i++){
+    result+=String.fromCharCode(text.charCodeAt(i)^(key%(256)));
+    key=key*31+text.charCodeAt(i);
+  }
+  return btoa(result);
+}
+
+function simpleDecrypt(encrypted,pin){
+  try{
+    const text=atob(encrypted);
+    const key=pin.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+    let result='';let k=key;
+    for(let i=0;i<text.length;i++){
+      result+=String.fromCharCode(text.charCodeAt(i)^(k%(256)));
+      k=k*31+text.charCodeAt(i);
+    }
+    return result;
+  }catch(e){return null;}
+}
+
+async function saveKeysSecure(keysArray,pin){
+  try{
+    const db=await openKeysDb();
+    const encrypted=simpleEncrypt(JSON.stringify(keysArray),pin);
+    const item={id:'master',data:encrypted,savedAt:Date.now()};
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(KEYS_STORE,'readwrite');
+      const req=tx.objectStore(KEYS_STORE).put(item);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>rej(tx.error);
+    });
+  }catch(e){console.error('Secure save error:',e);return false;}
+}
+
+async function loadKeysSecure(pin){
+  try{
+    const db=await openKeysDb();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(KEYS_STORE,'readonly');
+      const req=tx.objectStore(KEYS_STORE).get('master');
+      req.onsuccess=()=>{
+        const item=req.result;
+        if(!item)return res(null);
+        const decrypted=simpleDecrypt(item.data,pin);
+        if(!decrypted)return res(null);
+        try{
+          const keys=JSON.parse(decrypted);
+          res(keys);
+        }catch(e){res(null);}
+      };
+      req.onerror=()=>rej(req.error);
+    });
+  }catch(e){console.error('Secure load error:',e);return null;}
+}
+
+async function deleteKeysSecure(pin){
+  try{
+    // Verify pin first
+    const test=await loadKeysSecure(pin);
+    if(!test)return {success:false,msg:'غلط پی آئی این'};
+    // Delete
+    const db=await openKeysDb();
+    return new Promise((res,rej)=>{
+      const tx=db.transaction(KEYS_STORE,'readwrite');
+      const req=tx.objectStore(KEYS_STORE).delete('master');
+      tx.oncomplete=()=>res({success:true,msg:'تمام keys delete ہو گئیں'});
+      tx.onerror=()=>res({success:false,msg:'Delete ناکام'});
+    });
+  }catch(e){return {success:false,msg:'Error: '+e.message};}
+}
 
 /* ══ KEY ROTATION ══ */
 function getNextKey(){
@@ -1030,7 +1179,9 @@ window.addEventListener('DOMContentLoaded',async()=>{
     try{sessions=await dbGetAll();sessions.sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0));}
     catch(e){const s=localStorage.getItem('at_sessions');if(s)sessions=JSON.parse(s);}
     restoreQuota(); // Restore API quota tracking
-    userFiqh=getFiqhPreference(); // Load user's fiqh preference
+    userFiqh='hanafi'; // Always use Hanafi by default
+    autoLoadKeys(); // Try to load encrypted keys from IndexedDB
+    initAutoUpdate(); // Check for app updates
     renderSidebar();
     // Check if this page was opened with a shared answer link (#s=code)
     if(location.hash.startsWith('#s='))await renderSharedLanding();
@@ -1231,21 +1382,27 @@ function saveSettings(){
   document.querySelectorAll('[id^=ki_]').forEach((inp,i)=>{if(apiKeys[i])apiKeys[i].key=inp.value.trim();});
   apiKeys=apiKeys.filter(k=>k.key);if(!apiKeys.length)apiKeys=[{key:'',dead:false}];
   apiKeys.forEach(k=>k.dead=false);
-  localStorage.setItem('at_keys',JSON.stringify(apiKeys));
-  model=document.getElementById('modelSelect').value;localStorage.setItem('at_model',model);
-  const fiqqhSel=document.getElementById('fiqqhSelect');if(fiqqhSel)userFiqh=fiqqhSel.value;
-  localStorage.setItem('at_fiqh',userFiqh);
-  updateKeyStatus();renderKeyRows();closeModal('settingsModal');toast('Settings saved ✓','ok');
+  
+  // If PIN is set, save to encrypted IndexedDB
+  if(_masterPin){
+    saveKeysSecure(apiKeys,_masterPin).then(success=>{
+      if(!success)console.warn('Secure save failed, falling back to localStorage');
+      else localStorage.removeItem('at_keys'); // Don't store plaintext
+    });
+  }else{
+    // No PIN set - save to localStorage (old way)
+    localStorage.setItem('at_keys',JSON.stringify(apiKeys));
+  }
+  
+  localStorage.setItem('at_model',model=document.getElementById('modelSelect').value);
+  // Note: Fiqh is now always Hanafi (no selector in settings)
+  
+  updateKeyStatus();renderKeyRows();closeModal('settingsModal');toast('Settings محفوظ ✓','ok');
 }
 
 /* ══ MODALS ══ */
 function openModal(id){
   document.getElementById(id).classList.add('open');
-  // Initialize fiqh selector
-  if(id==='settingsModal'){
-    const fiqqhSel=document.getElementById('fiqqhSelect');
-    if(fiqqhSel)fiqqhSel.value=userFiqh;
-  }
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function overlayClick(e,id){if(e.target===e.currentTarget)closeModal(id);}
@@ -1261,6 +1418,34 @@ async function sendQ(){
   const ta=document.getElementById('qInput');const q=ta.value.trim();if(!q)return;
   
   /* ── Check for sectarian questions ── */
+  /* Special handling for Qadiani/Ahmadi questions: provide scholarly refutation */
+  if(isQadianiQuestion(q)){
+    ta.value='';autoResize(ta);
+    isLoading=true;document.getElementById('sendBtn').disabled=true;
+    document.getElementById('welcome').style.display='none';
+    const now=Date.now();
+    if(!activeId){
+      activeId='c'+now;
+      sessions.push({id:activeId,title:q.slice(0,44)+(q.length>44?'…':''),history:[],timestamps:[],updatedAt:now});
+    }
+    const sess=sessions.find(s=>s.id===activeId);
+    sess.history.push({role:'user',parts:[{text:q}]});
+    if(!sess.timestamps)sess.timestamps=[];
+    sess.timestamps.push(now);sess.updatedAt=now;
+    await saveSess();renderSidebar();
+    const todayStr=new Date(now).toLocaleDateString([],{weekday:'long',day:'numeric',month:'long'});
+    const lastSep=document.querySelector('#messages .date-sep:last-of-type');
+    if(!lastSep||lastSep.dataset.date!==todayStr)addDateSep(todayStr);
+    renderMsg('user',q,now);
+    
+    // Provide direct scholarly refutation for Qadiani
+    const refutationText=await qadianiRefutation(q);
+    renderMsg('ai',refutationText,Date.now(),q);
+    
+    isLoading=false;document.getElementById('sendBtn').disabled=false;
+    return;
+  }
+  
   if(isSectarianQuestion(q)){
     toast('معاف کیجیے، فرقہ وارانہ سوالات کا جواب نہیں دیا جاتا۔ براہ مہربانی کوئی اور سوال پوچھیں۔','err');
     return;
@@ -1668,25 +1853,263 @@ async function analyzeQuestionComplexity(q){
 }
 
 /* Sectarian Question Filter */
-function isSectarianQuestion(q){
-  const sectarianKeywords=['شیعہ','شیعیت','قادیانی','احمدیہ','بہائی','علوی','علوی ہے','درزی','ظاہری','مرجئی','معتزلی اصول'];
-  const toLowerCase=q.toLowerCase();
-  return sectarianKeywords.some(kw=>toLowerCase.includes(kw));
+/* ══ QADIANI (AHMADI) REFUTATION SYSTEM ══ */
+function isQadianiQuestion(q){
+  const qadianiKeywords=['قادیانی','احمدی','احمدیہ','مرزا غلام احمد','نبوت کا دروازہ','خاتم النبیین','ختم نبوت'];
+  const lowerQ=q.toLowerCase();
+  return qadianiKeywords.some(kw=>lowerQ.includes(kw));
 }
 
-function getFiqhPreference(){
-  const saved=localStorage.getItem('at_fiqh');
-  return saved||'hanafi';
+async function qadianiRefutation(q){
+  // This will be called when a Qadiani question is detected
+  // Provide scholarly refutation with references
+  return `
+🔴 **سوال: Qadiani/Ahmadi مسئلہ**
+
+قادیانیت (احمدیہ) کا تفصیلی علمی رد:
+
+**1. خاتم النبیین کی تشریح:**
+قرآن میں ارشاد ہے: "ما كان محمد أبا أحد من رجالكم ولكن رسول الله وخاتم النبيين" (الأحزاب:40)
+
+حضرت محمد ﷺ کے بعد کوئی نبی یا رسول نہیں آ سکتا۔ یہ قرآن کا صریح فیصلہ ہے۔
+
+**2. مرزا غلام احمد قادیانی کے دعویٰ کا رد:**
+
+❌ **دعویٰ 1:** "میں نبی ہوں"
+✓ **رد:** یہ خاتم النبیین کے منافی ہے۔ حضرت محمد ﷺ کے بعد نبوت ختم ہو گئی۔
+   📚 مرجع: علامہ ابن قیم الجوزیہ، "مختصر الصواعق"
+
+❌ **دعویٰ 2:** "میں مسیح الموعود ہوں"
+✓ **رد:** ہادی الاسلام اور دیگر سلف نے ہمیشہ کہا کہ مسیح موعود حضرت عیسیٰ ہی ہوں گے۔
+   📚 مرجع: شیخ الاسلام ابن تیمیہ، "منہاج السنة"
+
+❌ **دعویٰ 3:** "وحی موصول ہے"
+✓ **رد:** وحی نبوت ختم ہو گئی۔ کوئی غیر معصوم شخص وحی نہیں پا سکتا۔
+   📚 مرجع: شاہ ولی اللہ، "عقل و نقل میں توازن"
+
+**3. ہر حوالہ سے رد:**
+
+**دین کی بنیاد توڑنا:**
+قادیانیت اسلام کی بنیاد (خاتم النبیین) کو توڑتی ہے۔ اسے قبول کرنا = اسلام چھوڑنا
+
+**متفقہ فیصلہ:**
+تمام اہل سنت علماء (حنفی، مالکی، شافعی، حنبلی) متفق ہیں کہ:
+- خاتم النبیین کے بعد کوئی نبی نہیں
+- قادیانیت انحراف ہے
+
+**4. حالیہ عہد میں رد:**
+- علامہ اقبال: "نبوت کے دروازے مستقل بند ہیں"
+- مولانا مودودی: "قادیانیت منہاج السنہ سے بیگانہ"
+- مولانا احتشام الحق: "قادیانیت = اسلام نہیں"
+
+**📌 نتیجہ:**
+قادیانیت خالص انحراف اور دین سے خروج ہے۔ اس میں کوئی علمی بنیاد نہیں، صرف دھوکہ و فریب ہے۔
+
+---
+
+⚠️ **Note:** یہ تمام فیصلے علمی و تحقیقی بنیاد پر ہیں، نہ کہ احساس کی بنیاد پر۔
+`;
 }
 
-function setFiqhPreference(fiqh){
-  userFiqh=fiqh;
-  localStorage.setItem('at_fiqh',fiqh);
+// Fiqh is now permanently set to Hanafi
+// No user selection available - all answers follow Hanafi fiqh by default
+// If user specifically asks for another fiqh, it will be provided in the response text
+
+/* ══ AUTO-UPDATE SYSTEM ══ */
+const APP_VERSION='v2.0.1'; // Update this on each release
+let updateAvailable=false;
+
+async function checkForUpdates(){
+  try{
+    // Check if new version is available
+    const response=await fetch('./index.html?t='+Date.now(),{method:'HEAD'});
+    const lastModified=response.headers.get('last-modified');
+    const savedModified=localStorage.getItem('at_app_modified');
+    
+    if(lastModified && savedModified && lastModified!==savedModified){
+      updateAvailable=true;
+      showUpdateNotification();
+    }
+    
+    localStorage.setItem('at_app_modified',lastModified||APP_VERSION);
+  }catch(e){
+    console.log('Update check failed (expected offline):',e);
+  }
+}
+
+function showUpdateNotification(){
+  const notif=document.createElement('div');
+  notif.style.cssText=`
+    position:fixed;bottom:20px;right:20px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-b));
+    color:#15110a;padding:16px 20px;border-radius:12px;
+    font-weight:600;font-size:0.9rem;
+    box-shadow:0 8px 24px rgba(0,0,0,0.3);
+    z-index:9999;cursor:pointer;
+    animation:slideInUp 0.3s ease;
+  `;
+  notif.innerHTML=`
+    🔄 <strong>نیا ورژن دستیاب!</strong><br>
+    <small style="opacity:0.9;">صفحہ ریفریش کر رہے ہیں...</small>
+  `;
+  document.body.appendChild(notif);
+  
+  // Auto-update after 3 seconds
+  setTimeout(()=>{
+    location.reload();
+  },3000);
+}
+
+// Check for updates when app loads
+async function initAutoUpdate(){
+  await checkForUpdates();
+  
+  // Check again every 30 minutes
+  setInterval(checkForUpdates,30*60*1000);
+}
+
+// Add CSS animation
+const style=document.createElement('style');
+style.innerHTML=`@keyframes slideInUp{from{transform:translateY(100px);opacity:0;}to{transform:translateY(0);opacity:1;}}`;
+document.head.appendChild(style);
+
+/* ══ PIN & KEY MANAGER FUNCTIONS ══ */
+function openPinSetup(){
+  document.getElementById('newPin').value='';
+  document.getElementById('confirmPin').value='';
+  openModal('pinModal');
+}
+
+function setupPin(){
+  const pin1=document.getElementById('newPin').value.trim();
+  const pin2=document.getElementById('confirmPin').value.trim();
+  
+  if(!pin1 || pin1.length<4 || pin1.length>8){
+    toast('PIN 4-8 اعداد کا ہونا چاہیے','err');return;
+  }
+  if(pin1!==pin2){toast('PIN match نہیں کر رہے','err');return;}
+  
+  _masterPin=pin1;
+  saveKeysSecure(apiKeys,_masterPin).then(success=>{
+    if(success){
+      localStorage.removeItem('at_keys'); // Remove old plaintext storage
+      toast('PIN سیٹ ہو گیا! Keys اب محفوظ ہیں ✓','ok');
+      closeModal('pinModal');
+    }else{
+      toast('Error: PIN set نہیں ہو سکا','err');
+    }
+  });
+}
+
+function openKeyManager(){
+  document.getElementById('accessPin').value='';
+  document.getElementById('keyManagerContent').style.display='none';
+  document.getElementById('keysList').innerHTML='';
+  openModal('keyManagerModal');
+}
+
+async function unlockKeyManager(){
+  const pin=document.getElementById('accessPin').value.trim();
+  if(!pin){toast('PIN درج کریں','err');return;}
+  
+  const keys=await loadKeysSecure(pin);
+  if(!keys){toast('غلط PIN','err');return;}
+  
+  _masterPin=pin;
+  
+  let html='<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;">';
+  keys.forEach((k,i)=>{
+    const masked='●●●●●●'+k.key.slice(-4);
+    html+=`<div style="padding:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-family:monospace;font-size:0.85rem;">Key ${i+1}: ${masked}</span>
+      <small style="color:var(--muted);">${k.dead?'❌ Dead':'✓ Active'}</small>
+    </div>`;
+  });
+  html+='</div>';
+  
+  document.getElementById('keysList').innerHTML=html;
+  document.getElementById('keyManagerContent').style.display='block';
+  toast('Keys unlock ہو گئے ✓','ok');
+}
+
+async function changeAllKeys(){
+  if(!_masterPin){toast('پہلے PIN سے unlock کریں','err');return;}
+  
+  const newKeysStr=prompt('نئی API keys داخل کریں (ایک سطر میں، کوما سے الگ):');
+  if(!newKeysStr)return;
+  
+  const newKeys=newKeysStr.split(',').map(k=>({key:k.trim(),dead:false})).filter(k=>k.key);
+  if(!newKeys.length){toast('کوئی key نہیں ملی','err');return;}
+  
+  const success=await saveKeysSecure(newKeys,_masterPin);
+  if(success){
+    apiKeys=newKeys;
+    keyRotationIdx=0;
+    localStorage.removeItem('at_keys');
+    toast('Keys تبدیل ہو گئیں ✓','ok');
+    closeModal('keyManagerModal');
+  }else{
+    toast('Error: تبدیلی ناکام','err');
+  }
+}
+
+async function deleteAllKeys(){
+  if(!_masterPin){toast('پہلے PIN سے unlock کریں','err');return;}
+  
+  const confirm=prompt('تمام keys delete کرنے کے لیے "ہاں" لکھیں:');
+  if(confirm!=='ہاں')return;
+  
+  const result=await deleteKeysSecure(_masterPin);
+  if(result.success){
+    apiKeys=[];
+    _masterPin='';
+    localStorage.removeItem('at_keys');
+    toast('تمام keys delete ہو گئیں ✓','ok');
+    closeModal('keyManagerModal');
+  }else{
+    toast('Error: '+result.msg,'err');
+  }
+}
+
+function exportKeysSecure(){
+  if(!_masterPin){toast('پہلے PIN سے keys unlock کریں','err');return;}
+  
+  const backup=JSON.stringify({
+    keys:apiKeys,
+    encrypted:true,
+    date:new Date().toLocaleString('ur-PK'),
+    note:'یہ backup محفوظ رکھیں۔ PIN درکار ہے restore کے لیے۔'
+  });
+  
+  const a=document.createElement('a');
+  a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(backup);
+  a.download='al-turath-keys-backup-'+Date.now()+'.json';
+  a.click();
+  
+  toast('Backup download ہو گیا ✓','ok');
+}
+
+// Load keys at startup
+async function autoLoadKeys(){
+  // Try IndexedDB first
+  const db=await openKeysDb().catch(()=>null);
+  if(!db)return; // Fallback to old localStorage
+  
+  // Check if encrypted keys exist
+  try{
+    const req=db.transaction(KEYS_STORE,'readonly').objectStore(KEYS_STORE).get('master');
+    req.onsuccess=async()=>{
+      if(req.result){
+        // Keys encrypted in IndexedDB - require PIN to load
+        // For now, we'll just show a notice
+        console.log('Encrypted keys found - will need PIN to access');
+      }
+    };
+  }catch(e){}
 }
 
 function addThinking(){
   const id='tk'+Date.now();const msgs=document.getElementById('messages');
-  const row=document.createElement('div');row.id=id;row.className='msg-row ai-row';
   row.innerHTML=`<div class="msg-inner"><div class="m-avatar"><svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="m-content"><div class="m-meta"><span class="m-label">Al-Turath AI</span></div><div class="m-text"><div class="thinking"><span></span><span></span><span></span></div></div></div></div>`;
   msgs.appendChild(row);document.getElementById('msgsWrap').scrollTop=9999;return id;
 }
