@@ -665,24 +665,24 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
       <button class="btn-addkey" onclick="addKeyRow()">+ Add Another Key</button>
     </div>
     <div class="f-row">
-      <label>📱 API Keys (محفوظ Storage)</label>
+      <label>📱 API Keys (Secure Storage)</label>
       <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px;">
-        API keys IndexedDB میں محفوظ ہیں۔ ⚠️ اگر آپ براؤزر کی "Clear Browsing Data" میں <strong>"Cookies and site data"</strong> کا آپشن بھی منتخب کریں تو یہ ایپ کا تمام ڈیٹا (API keys، سیٹنگز، چیٹ ہسٹری) بھی ختم کر دیتا ہے — یہ Android/Chrome کا اپنا عمومی رویہ ہے۔ صاف کرتے وقت صرف "Browsing history" اور "Cache" منتخب کریں، "Site data/Cookies" کو غیر منتخب رکھیں۔ بہتر یہی ہے کہ نیچے سے پہلے بیک اپ لے لیں۔
+        API keys are stored in IndexedDB. ⚠️ If you select <strong>"Cookies and site data"</strong> when using your browser's "Clear Browsing Data" option, this app's entire data (API keys, settings, chat history) will also be erased — this is normal Android/Chrome behavior. When clearing data, only select "Browsing history" and "Cache", and leave "Site data/Cookies" unchecked. It's best to take a backup below first.
       </p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-sm" onclick="editAllKeys()">✏️ تبدیل کریں</button>
+        <button class="btn-sm" onclick="editAllKeys()">✏️ Edit</button>
         <button class="btn-sm" onclick="deleteAllKeys()" style="background:#ef4444;">🗑️ Delete</button>
       </div>
     </div>
     <hr class="f-divider">
     <div class="f-row">
-      <label>📦 ڈیٹا بیک اپ / بحالی</label>
+      <label>📦 Data Backup / Restore</label>
       <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px;">
-        تمام API keys، سیٹنگز اور چیٹ ہسٹری ایک فائل میں محفوظ کریں — تاکہ براؤزر ڈیٹا صاف ہونے کی صورت میں دوبارہ سیٹ اپ نہ کرنا پڑے۔ بیک اپ فائل کو فون کی محفوظ جگہ (مثلاً Google Drive) پر رکھیں۔
+        Save all API keys, settings, and chat history into one file — so you won't need to set everything up again if browser data gets cleared. Keep the backup file in a safe place on your phone (e.g. Google Drive).
       </p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-sm" onclick="exportBackup()">📥 بیک اپ ڈاؤن لوڈ کریں</button>
-        <button class="btn-sm" onclick="document.getElementById('restoreFileInput').click()" style="background:#3a9e60;">📤 بیک اپ بحال کریں</button>
+        <button class="btn-sm" onclick="exportBackup()">📥 Download Backup</button>
+        <button class="btn-sm" onclick="document.getElementById('restoreFileInput').click()" style="background:#3a9e60;">📤 Restore Backup</button>
         <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none" onchange="importBackup(this.files[0])">
       </div>
     </div>
@@ -721,59 +721,9 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
-<!-- ══ ABOUT MODAL ══ -->
-<div class="overlay" id="pinModal" onclick="overlayClick(event,'pinModal')">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>🔐 محفوظ PIN سیٹ کریں</h2>
-      <button class="modal-close" onclick="closeModal('pinModal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px;">
-        یہ PIN آپ کے API keys کو encrypt کرے گا۔ اسے یاد رکھیں!<br>
-        <strong>نہ بھولیں:</strong> بغیر PIN کے keys access نہیں ہو سکتے۔
-      </p>
-      <div class="f-row">
-        <label>نیا PIN (4-8 digits)</label>
-        <input id="newPin" type="password" placeholder="مثال: 1234" maxlength="8" style="width:100%;">
-      </div>
-      <div class="f-row">
-        <label>PIN دوبارہ درج کریں</label>
-        <input id="confirmPin" type="password" placeholder="تصدیق کریں" maxlength="8" style="width:100%;">
-      </div>
-      <div style="display:flex;gap:8px;margin-top:16px;">
-        <button class="btn-primary" onclick="setupPin()" style="flex:1;">PIN سیٹ کریں</button>
-        <button class="btn-secondary" onclick="closeModal('pinModal')" style="flex:1;">منسوخ</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- pinModal and keyManagerModal removed: dead markup, never opened by any code path,
+     and referenced functions (setupPin/unlockKeyManager/changeAllKeys) didn't exist. -->
 
-<div class="overlay" id="keyManagerModal" onclick="overlayClick(event,'keyManagerModal')">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>🔑 API Keys Manager</h2>
-      <button class="modal-close" onclick="closeModal('keyManagerModal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="f-row">
-        <label>PIN درج کریں</label>
-        <input id="accessPin" type="password" placeholder="PIN" maxlength="8" style="width:100%;">
-      </div>
-      <button class="btn-sm" onclick="unlockKeyManager()" style="margin-bottom:14px;width:100%;">🔓 Unlock</button>
-      
-      <div id="keyManagerContent" style="display:none;">
-        <div id="keysList" style="max-height:300px;overflow-y:auto;margin-bottom:14px;"></div>
-        
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn-sm" onclick="changeAllKeys()" style="background:#f59e0b;">✏️ تبدیل کریں</button>
-          <button class="btn-sm" onclick="deleteAllKeys()" style="background:#ef4444;">🗑️ Delete کریں</button>
-          <button class="btn-sm" onclick="closeModal('keyManagerModal')">بند کریں</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 <div class="overlay" id="aboutModal" onclick="overlayClick(event,'aboutModal')">
   <div class="modal" style="max-width:520px;direction:ltr;text-align:left">
     <div class="modal-h">
@@ -1227,10 +1177,10 @@ async function exportBackup(){
     a.href=url;a.download='al-turath-backup-'+stamp+'.json';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),2000);
-    toast('بیک اپ فائل ڈاؤن لوڈ ہو گئی ✓ — اسے محفوظ جگہ پر رکھیں','ok');
+    toast('Backup file downloaded ✓ — keep it somewhere safe','ok');
   }catch(e){
     console.error('Backup export error:',e);
-    toast('بیک اپ بنانے میں خرابی — دوبارہ کوشش کریں','err');
+    toast('Error creating backup — please try again','err');
   }
 }
 
@@ -1240,10 +1190,10 @@ async function importBackup(file){
     const text=await file.text();
     const backup=JSON.parse(text);
     if(!backup||backup.app!=='Al-Turath AI'){
-      toast('یہ فائل Al-Turath AI بیک اپ نہیں لگتی','err');
+      toast('This file doesn\'t look like an Al-Turath AI backup','err');
       return;
     }
-    if(!confirm('بیک اپ بحال کرنے سے موجودہ API keys، سیٹنگز اور چیٹ ہسٹری اوور رائٹ ہو جائیں گی۔ جاری رکھیں؟'))return;
+    if(!confirm('Restoring this backup will overwrite your current API keys, settings, and chat history. Continue?'))return;
 
     if(Array.isArray(backup.apiKeys)){
       apiKeys=backup.apiKeys;
@@ -1258,11 +1208,11 @@ async function importBackup(file){
         try{localStorage.setItem('at_sessions',JSON.stringify(backup.sessions));}catch(e2){}
       }
     }
-    toast('بیک اپ بحال ہو گیا ✓ — ایپ دوبارہ لوڈ ہو رہی ہے...','ok');
+    toast('Backup restored ✓ — reloading app...','ok');
     setTimeout(()=>location.reload(),1200);
   }catch(e){
     console.error('Backup import error:',e);
-    toast('بیک اپ فائل پڑھنے میں خرابی — فائل درست نہیں','err');
+    toast('Error reading backup file — file is invalid','err');
   }
 }
 
@@ -1503,7 +1453,7 @@ function saveSettings(){
   }
   
   // Model selection removed - using auto-routing now
-  updateKeyStatus();renderKeyRows();closeModal('settingsModal');toast('Settings محفوظ ✓','ok');
+  updateKeyStatus();renderKeyRows();closeModal('settingsModal');toast('Settings saved ✓','ok');
 }
 
 /* ══ MODALS ══ */
@@ -1954,11 +1904,11 @@ document.head.appendChild(style);
 /* ══ PIN & KEY MANAGER FUNCTIONS ══ */
 /* Simple API Key Management (No PIN required) */
 function editAllKeys(){
-  const newKeysStr=prompt('نئی API keys درج کریں (کوما سے الگ):\n\nمثال: key1, key2, key3');
+  const newKeysStr=prompt('Enter new API keys (comma separated):\n\nExample: key1, key2, key3');
   if(!newKeysStr)return;
   
   const newKeys=newKeysStr.split(',').map(k=>({key:k.trim(),dead:false})).filter(k=>k.key);
-  if(!newKeys.length){toast('کوئی key نہیں ملی','err');return;}
+  if(!newKeys.length){toast('No key found','err');return;}
   
   apiKeys=newKeys;
   keyRotationIdx=0;
@@ -1967,7 +1917,7 @@ function editAllKeys(){
   saveKeysSecure(newKeys,'').then(success=>{
     if(success){
       localStorage.removeItem('at_keys');
-      toast('API Keys تبدیل ہو گئیں ✓','ok');
+      toast('API Keys updated ✓','ok');
       updateKeyStatus();
       renderKeyRows();
     }
@@ -1975,7 +1925,7 @@ function editAllKeys(){
 }
 
 function deleteAllKeys(){
-  const confirm=prompt('تمام API keys delete کرنے کے لیے "DELETE" لکھیں:');
+  const confirm=prompt('Type "DELETE" to remove all API keys:');
   if(confirm!=='DELETE')return;
   
   apiKeys=[];
@@ -1984,11 +1934,11 @@ function deleteAllKeys(){
   
   deleteKeysSecure('').then(result=>{
     if(result.success){
-      toast('تمام API keys delete ہو گئیں ✓','ok');
+      toast('All API keys deleted ✓','ok');
       updateKeyStatus();
       renderKeyRows();
     }else{
-      toast('Delete میں خرابی','err');
+      toast('Delete failed','err');
     }
   });
 }
