@@ -667,11 +667,23 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
     <div class="f-row">
       <label>📱 API Keys (محفوظ Storage)</label>
       <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px;">
-        تمام API keys IndexedDB میں محفوظ ہیں۔ Browser history clear سے بھی محفوظ رہیں گی۔
+        API keys IndexedDB میں محفوظ ہیں۔ ⚠️ اگر آپ براؤزر کی "Clear Browsing Data" میں <strong>"Cookies and site data"</strong> کا آپشن بھی منتخب کریں تو یہ ایپ کا تمام ڈیٹا (API keys، سیٹنگز، چیٹ ہسٹری) بھی ختم کر دیتا ہے — یہ Android/Chrome کا اپنا عمومی رویہ ہے۔ صاف کرتے وقت صرف "Browsing history" اور "Cache" منتخب کریں، "Site data/Cookies" کو غیر منتخب رکھیں۔ بہتر یہی ہے کہ نیچے سے پہلے بیک اپ لے لیں۔
       </p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-sm" onclick="editAllKeys()">✏️ تبدیل کریں</button>
         <button class="btn-sm" onclick="deleteAllKeys()" style="background:#ef4444;">🗑️ Delete</button>
+      </div>
+    </div>
+    <hr class="f-divider">
+    <div class="f-row">
+      <label>📦 ڈیٹا بیک اپ / بحالی</label>
+      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px;">
+        تمام API keys، سیٹنگز اور چیٹ ہسٹری ایک فائل میں محفوظ کریں — تاکہ براؤزر ڈیٹا صاف ہونے کی صورت میں دوبارہ سیٹ اپ نہ کرنا پڑے۔ بیک اپ فائل کو فون کی محفوظ جگہ (مثلاً Google Drive) پر رکھیں۔
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-sm" onclick="exportBackup()">📥 بیک اپ ڈاؤن لوڈ کریں</button>
+        <button class="btn-sm" onclick="document.getElementById('restoreFileInput').click()" style="background:#3a9e60;">📤 بیک اپ بحال کریں</button>
+        <input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none" onchange="importBackup(this.files[0])">
       </div>
     </div>
     <hr class="f-divider">
@@ -1183,6 +1195,77 @@ async function dbPut(s){const d=await openDB();return new Promise((res,rej)=>{co
 async function dbDelete(id){const d=await openDB();return new Promise((res,rej)=>{const tx=d.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)});}
 async function dbSize(){try{if(navigator.storage&&navigator.storage.estimate){const{usage}=await navigator.storage.estimate();return usage||0;}}catch(e){}return 0;}
 
+/* براؤزر سے "persistent storage" کی درخواست — یہ صرف خودکار/disk-pressure والے
+   eviction سے بچاتا ہے۔ یاد رہے: یہ صارف کے خود "Clear Browsing Data → Site data"
+   استعمال کرنے کی صورت میں ڈیٹا کو نہیں بچا سکتا — وہ ہمیشہ سب کچھ صاف کر دے گا،
+   چاہے یہ permission مل بھی جائے۔ اسی لیے نیچے Export/Import بیک اپ فیچر دیا گیا ہے۔ */
+if(navigator.storage&&navigator.storage.persist){
+  navigator.storage.persist().catch(()=>{});
+}
+
+/* ══ بیک اپ / بحالی — API keys + سیٹنگز + چیٹ ہسٹری کو ایک JSON فائل میں ══ */
+async function exportBackup(){
+  try{
+    let allSessions=[];
+    try{allSessions=await dbGetAll();}catch(e){}
+    const backup={
+      app:'Al-Turath AI',
+      backupVersion:1,
+      exportedAt:new Date().toISOString(),
+      apiKeys:apiKeys||[],
+      model:localStorage.getItem('at_model')||model||'',
+      theme:localStorage.getItem('at_theme')||'dark',
+      fontSize:localStorage.getItem('at_font_size')||'14',
+      sbFont:localStorage.getItem('at_sb_font')||'14',
+      sessions:allSessions
+    };
+    const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const d=new Date();
+    const stamp=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+    a.href=url;a.download='al-turath-backup-'+stamp+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    toast('بیک اپ فائل ڈاؤن لوڈ ہو گئی ✓ — اسے محفوظ جگہ پر رکھیں','ok');
+  }catch(e){
+    console.error('Backup export error:',e);
+    toast('بیک اپ بنانے میں خرابی — دوبارہ کوشش کریں','err');
+  }
+}
+
+async function importBackup(file){
+  if(!file)return;
+  try{
+    const text=await file.text();
+    const backup=JSON.parse(text);
+    if(!backup||backup.app!=='Al-Turath AI'){
+      toast('یہ فائل Al-Turath AI بیک اپ نہیں لگتی','err');
+      return;
+    }
+    if(!confirm('بیک اپ بحال کرنے سے موجودہ API keys، سیٹنگز اور چیٹ ہسٹری اوور رائٹ ہو جائیں گی۔ جاری رکھیں؟'))return;
+
+    if(Array.isArray(backup.apiKeys)){
+      apiKeys=backup.apiKeys;
+      localStorage.setItem('at_keys',JSON.stringify(apiKeys));
+    }
+    if(backup.model){localStorage.setItem('at_model',backup.model);}
+    if(backup.theme){localStorage.setItem('at_theme',backup.theme);}
+    if(backup.fontSize){localStorage.setItem('at_font_size',backup.fontSize);}
+    if(backup.sbFont){localStorage.setItem('at_sb_font',backup.sbFont);}
+    if(Array.isArray(backup.sessions)&&backup.sessions.length){
+      try{for(const s of backup.sessions){await dbPut(s);}}catch(e){
+        try{localStorage.setItem('at_sessions',JSON.stringify(backup.sessions));}catch(e2){}
+      }
+    }
+    toast('بیک اپ بحال ہو گیا ✓ — ایپ دوبارہ لوڈ ہو رہی ہے...','ok');
+    setTimeout(()=>location.reload(),1200);
+  }catch(e){
+    console.error('Backup import error:',e);
+    toast('بیک اپ فائل پڑھنے میں خرابی — فائل درست نہیں','err');
+  }
+}
+
 /* ══ INIT ══ */
 window.addEventListener('DOMContentLoaded',async()=>{
   setTimeout(()=>{const sp=document.getElementById('splash');if(sp)sp.classList.add('hide');},4200);
@@ -1206,7 +1289,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
     restoreQuota(); // Restore API quota tracking
     userFiqh='hanafi'; // Always use Hanafi by default
     autoLoadKeys(); // Try to load encrypted keys from IndexedDB
-    initAutoUpdate(); // Check for app updates
+    // initAutoUpdate() removed — replaced by silent service-worker based auto-update (see PWA section)
     renderSidebar();
     // Check if this page was opened with a shared answer link (#s=code)
     if(location.hash.startsWith('#s='))await renderSharedLanding();
@@ -1854,61 +1937,14 @@ async function analyzeQuestionComplexity(q){
 // No user selection available - all answers follow Hanafi fiqh by default
 // If user specifically asks for another fiqh, it will be provided in the response text
 
-/* ══ AUTO-UPDATE SYSTEM ══ */
-const APP_VERSION='v2.0.1'; // Update this on each release
-let updateAvailable=false;
-
-async function checkForUpdates(){
-  try{
-    // Check if new version is available
-    const response=await fetch('./index.html?t='+Date.now(),{method:'HEAD'});
-    const lastModified=response.headers.get('last-modified');
-    const savedModified=localStorage.getItem('at_app_modified');
-    
-    if(lastModified && savedModified && lastModified!==savedModified){
-      updateAvailable=true;
-      showUpdateNotification();
-    }
-    
-    localStorage.setItem('at_app_modified',lastModified||APP_VERSION);
-  }catch(e){
-    console.log('Update check failed (expected offline):',e);
-  }
-}
-
-function showUpdateNotification(){
-  const notif=document.createElement('div');
-  notif.style.cssText=`
-    position:fixed;bottom:20px;right:20px;
-    background:linear-gradient(135deg,var(--gold),var(--gold-b));
-    color:#15110a;padding:16px 20px;border-radius:12px;
-    font-weight:600;font-size:0.9rem;
-    box-shadow:0 8px 24px rgba(0,0,0,0.3);
-    z-index:9999;cursor:pointer;
-    animation:slideInUp 0.3s ease;
-  `;
-  notif.innerHTML=`
-    🔄 <strong>نیا ورژن دستیاب!</strong><br>
-    <small style="opacity:0.9;">صفحہ ریفریش کر رہے ہیں...</small>
-  `;
-  document.body.appendChild(notif);
-  
-  // Auto-update after 3 seconds
-  setTimeout(()=>{
-    location.reload();
-  },3000);
-}
-
-// Check for updates when app loads (non-blocking)
-async function initAutoUpdate(){
-  try{
-    await checkForUpdates();
-    // Check again every 30 minutes in background
-    setInterval(()=>checkForUpdates().catch(e=>console.warn('Update check failed')), 30*60*1000);
-  }catch(e){
-    console.warn('Auto-update init failed:', e);
-  }
-}
+/* AUTO-UPDATE SYSTEM — اب مکمل طور پر service-worker پر منتقل کر دیا گیا ہے
+   (دیکھیں PWA سیکشن: skipWaiting + clients.claim + controllerchange → silent reload)۔
+   پرانا fetch('./index.html', {method:'HEAD'}) والا نظام ہٹا دیا گیا کیونکہ:
+   1) یہ ایک نظر آنے والا "نیا ورژن دستیاب" پیغام دکھاتا تھا — جو خاموش/invisible
+      اپڈیٹ کی شرط کے خلاف تھا۔
+   2) آف لائن یا کسی بھی نیٹ ورک/preview پابندی کی صورت میں یہ fetch ناکام ہو کر
+      کنسول میں "Update check failed (expected offline): Error: Failed to fetch"
+      جیسا پیغام چھوڑ جاتا تھا۔ */
 
 // Add CSS animation
 const style=document.createElement('style');
