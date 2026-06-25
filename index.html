@@ -270,6 +270,7 @@ a{text-decoration:none}
 .arabic-block{
   display:block;
   direction:rtl;
+  unicode-bidi:embed;
   margin:8px 0 6px;
   padding:0;
   background:none;
@@ -348,6 +349,7 @@ a{text-decoration:none}
   font-size:calc(var(--chat-fs) - 3px);
   color:var(--gold-l);
   direction:rtl;
+  unicode-bidi:isolate;
   opacity:.75;
   margin-right:5px;
 }
@@ -359,6 +361,7 @@ a{text-decoration:none}
   color:var(--gold-l);
   opacity:.8;
   direction:rtl;
+  unicode-bidi:isolate;
   margin-right:4px;
 }
 .arabic-block.quran .ar-ref-inline{color:#3a9e60;}
@@ -1005,6 +1008,8 @@ Al-Turath AI کے جوابات اسلامیات کی ہزاروں مستند ک�
 
 ## خلاصہ — bullet points کی شکل میں جامع، مختصر اور مدلل نکات (ہر نکتہ ایک مکمل علمی بات)
 ## دعوتِ فکر — رسمی نہیں بلکہ جھنجھوڑ دینے والا سوال جو انسان کو اسلام کی سچائی، حکمت اور ہدایت کی طرف متوجہ کرے
+
+⚠️ heading کا متن (## کے بعد آنے والے الفاظ — مثلاً "خلاصہ"، "دعوتِ فکر"، یا کوئی بھی عنوان) کبھی بھی کسی بریکٹ میں نہ لکھیں — نہ ( )، نہ ﴿ ﴾، نہ 《 》، نہ [ ]۔ صرف سادہ متن لکھیں: "## خلاصہ" درست ہے، "## (خلاصہ)" یا "## ﴿خلاصہ﴾" بالکل غلط ہے۔
 
 **Token Efficiency (STRICT):**
 - غیر ضروری تمہید، تکرار اور padding بالکل نہیں
@@ -1989,6 +1994,19 @@ function addThinking(){
 }
 function removeThinking(id){const el=document.getElementById(id);if(el)el.remove();}
 
+/* اگر heading کا پورا متن کسی ایک بریکٹ جوڑے میں مکمل طور پر لپٹا ہوا ہو تو وہ بریکٹ ہٹا دو
+   (مثلاً ماڈل کبھی "(خلاصہ)" لکھ دے تو صرف "خلاصہ" دکھایا جائے) */
+function stripWrapBrackets(t){
+  t=t.trim();
+  const pairs=[['(',')'],['﴿','﴾'],['《','》'],['【','】'],['[',']'],['「','」']];
+  for(const [o,c] of pairs){
+    if(t.startsWith(o)&&t.endsWith(c)&&t.length>o.length+c.length){
+      return t.slice(o.length,-c.length).trim();
+    }
+  }
+  return t;
+}
+
 /* ══ MARKDOWN ══ */
 function fmtMd(raw){
   const lines=raw.split('\n'),out=[];let i=0;let olCounter=1;
@@ -2026,19 +2044,19 @@ function fmtMd(raw){
       if(parts.intro) html+='<span class="ar-intro">'+parts.intro+'</span>';
       // ref inline after arabic text in brackets
       if(parts.text.length){
-        const refInline=parts.ref?'<span class="ar-ref-inline"> ('+parts.ref.trim()+')</span>':'';
+        const refInline=parts.ref?'<span class="ar-ref-inline">\u2067 ('+parts.ref.trim()+')\u2069</span>':'';
         html+='<span class="ar-text">'+parts.text.join('<br>')+refInline+'</span>';
       }
       if(parts.tr) html+='<span class="ar-tr">'+parts.tr.trim()+'</span>';
-      if(parts.note) html+='<span class="ar-note">('+parts.note.trim()+')</span>';
+      if(parts.note) html+='<span class="ar-note">\u2067('+parts.note.trim()+')\u2069</span>';
       html+='</div>';
       out.push(html);
       continue;
     }
     if(/^\|.+\|/.test(line)){const tb=[];while(i<lines.length&&/^\|.+\|/.test(lines[i])){tb.push(lines[i]);i++;}out.push(parseTable(tb.join('\n')));continue;}
     if(/^---+$/.test(line.trim())){out.push('<hr style="border:none;border-top:1px solid var(--border2);margin:10px 0">');i++;continue;}
-    if(/^#{1,6}\s+/.test(line)){out.push('<span class="md-h3">'+inl(line.replace(/^#{1,6}\s+/,''))+'</span>');i++;continue;}
-    if(/^\*\*[^*]+\*\*\s*$/.test(line.trim())){out.push('<span class="md-h3">'+inl(line.trim().replace(/^\*\*|\*\*$/g,''))+'</span>');i++;continue;}
+    if(/^#{1,6}\s+/.test(line)){out.push('<span class="md-h3">'+inl(stripWrapBrackets(line.replace(/^#{1,6}\s+/,'')))+'</span>');i++;continue;}
+    if(/^\*\*[^*]+\*\*\s*$/.test(line.trim())){out.push('<span class="md-h3">'+inl(stripWrapBrackets(line.trim().replace(/^\*\*|\*\*$/g,'')))+'</span>');i++;continue;}
     if(/^[•\-\*]\s+/.test(line)){const items=[];while(i<lines.length&&/^[•\-\*]\s+/.test(lines[i])){items.push('<li>'+inl(lines[i].replace(/^[•\-\*]\s+/,''))+'</li>');i++;}out.push('<ul>'+items.join('')+'</ul>');continue;}
     if(/^\d+\.\s+/.test(line)){const items=[];while(i<lines.length&&/^\d+\.\s+/.test(lines[i])){items.push('<li>'+inl(lines[i].replace(/^\d+\.\s+/,''))+'</li>');i++;}out.push('<ol start="'+olCounter+'">'+items.join('')+'</ol>');olCounter+=items.length;continue;}
     if(line.trim()===''){i++;continue;}
@@ -2051,6 +2069,13 @@ function fmtMd(raw){
 
 function inl(t){
   t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // ── Bidi fix: any reference like ﴿37:13﴾ or (کتاب، 124) mixes RTL text with
+  // LTR digits/colons. Without isolation the browser's bidi algorithm can place
+  // the bracket on the wrong side. Wrapping the whole bracketed unit in RTL
+  // isolate marks (U+2067 … U+2069) forces it to render as one atomic block,
+  // in the correct order, regardless of what surrounds it. ──
+  t=t.replace(/﴿([^﴿﴾]*\d[^﴿﴾]*)﴾/g,(m)=>'\u2067'+m+'\u2069');
+  t=t.replace(/\(([^()]*\d[^()]*)\)/g,(m)=>'\u2067'+m+'\u2069');
   t=t.replace(/\*\*\*(.+?)\*\*\*/g,'<strong>$1</strong>');
   t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');
