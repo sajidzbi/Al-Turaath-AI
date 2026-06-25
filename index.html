@@ -1759,8 +1759,8 @@ async function renderSharedLanding(){
   
   const answerRow=renderMsg('ai',answerText,null,item.q||'');
   
-  // اگر ایپ انسٹال نہیں ہے تو install بینر شامل کریں
-  if(!pwaIsStandalone()){
+  // اگر ایپ انسٹال نہیں ہے تو install بینر شامل کریں (پہلے سے انسٹال ہونے کی صورت میں کبھی نہیں)
+  if(!pwaIsStandalone() && localStorage.getItem(PWA_INSTALLED_KEY)!=='1'){
     answerRow.insertAdjacentHTML('afterend',sharedInstallBannerHtml());
   }
   
@@ -2185,7 +2185,22 @@ if(pwaIsIOS()){
 }
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw.js').then((reg)=>{
+      // نیا ورژن خود بخود، خاموشی سے، بیک گراؤنڈ میں چیک ہو — کوئی پاپ اپ نہیں
+      reg.update().catch(()=>{});
+      setInterval(()=>{reg.update().catch(()=>{});},60*60*1000); // ہر گھنٹے سائلنٹ چیک
+      document.addEventListener('visibilitychange',()=>{
+        if(document.visibilityState==='visible')reg.update().catch(()=>{});
+      });
+    }).catch(()=>{});
+  });
+  // نئی service worker کنٹرول لیتے ہی صفحہ خود بخود (بغیر کسی پیغام/تصدیق کے) ایک بار ریلوڈ ہو
+  // تاکہ نیا ورژن فوری اور خاموشی سے لاگو ہو جائے۔
+  let _swControllerReloaded=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(_swControllerReloaded)return;
+    _swControllerReloaded=true;
+    window.location.reload();
   });
 }
 </script>
