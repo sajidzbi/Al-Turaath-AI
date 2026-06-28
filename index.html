@@ -796,6 +796,10 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
 
 <div class="toast" id="toast"></div>
 
+<!-- Firebase (شیئر فیچر کے لیے — Q/A کو مختصر کوڈ کے ساتھ سرور پر محفوظ کرنے کے لیے) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
 <script>
 /* ══════════════════════════════════════════════════════════════════
    SMART SOURCE ROUTER — Token-efficient targeted search
@@ -1640,71 +1644,79 @@ function renderMsg(role,text,ts,question){
   return row;
 }
 
-/* ══════════════════════ SHARE FEATURE (SELF-CONTAINED LINK) ══════════════════════
-   Q/A کو IndexedDB میں محفوظ کرنے کی بجائے خود لنک (#s=...) کے اندر ہی انکوڈ کر دیتے
-   ہیں، تاکہ جو بھی لنک کھولے — اپنے ڈیوائس یا براؤزر میں، چاہے ایپ انسٹال ہو یا نہ ہو —
-   اسے ڈیٹا مل جائے۔ (پہلے کوڈ صرف بھیجنے والے کے IndexedDB میں محفوظ ہوتا تھا، اس لیے
-   لنک وصول کرنے والے کے پاس وہ ڈیٹا کبھی موجود ہی نہیں ہوتا تھا۔)
-   URL: https://sajidzbi.github.io/Al-Turaath-AI/#s=<encoded-data>
+/* ══════════════════════ SHARE FEATURE (FIREBASE SHORT-CODE) ══════════════════════
+   ہر شیئر شدہ جواب Firestore پر محفوظ ہوتا ہے، اور لنک میں صرف ایک مختصر کوڈ جاتا ہے
+   (مثلاً #s=aB3xK9pQ) — اس طرح لنک ہمیشہ چھوٹا رہتا ہے، چاہے جواب جتنا بھی لمبا ہو،
+   اور جو بھی لنک کھولے (کسی بھی ڈیوائس پر، ایپ انسٹال ہو یا نہ ہو) اسے سرور سے پورا
+   جواب مل جاتا ہے۔
+
+   Firebase پراجیکٹ "al-turath-ai" سے جڑا ہوا ہے — یہ تمام کاپیوں میں ایک ہی رہے گا،
+   اس لیے کسی صارف کو الگ سے کچھ سیٹ اپ نہیں کرنا پڑتا۔
+   URL: https://sajidzbi.github.io/Al-Turaath-AI/#s=<short-code>
    ══════════════════════════════════════════════════════════════════════════════ */
 
 const APP_HOME_URL='https://sajidzbi.github.io/Al-Turaath-AI/';
 const INSTALL_GUIDE_URL='./Al-Turath-AI-Installation_Guide.pdf';
 
-function _bytesToBase64Url(bytes){
-  let binary='';
-  for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
-  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-function _base64UrlToBytes(str){
-  let b64=str.replace(/-/g,'+').replace(/_/g,'/');
-  while(b64.length%4)b64+='=';
-  const binary=atob(b64);
-  const bytes=new Uint8Array(binary.length);
-  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-  return bytes;
+const firebaseConfig={
+  apiKey:"AIzaSyBC5dfaWy0pxABG73xbNwGcryEKh1-46ng",
+  authDomain:"al-turath-ai.firebaseapp.com",
+  projectId:"al-turath-ai",
+  storageBucket:"al-turath-ai.firebasestorage.app",
+  messagingSenderId:"443522778710",
+  appId:"1:443522778710:web:ea55140afc6944bfa79df7"
+};
+
+let _fbDb=null;
+function getFbDb(){
+  if(_fbDb)return _fbDb;
+  if(!firebaseConfig.apiKey||firebaseConfig.apiKey==='REPLACE_ME'){
+    console.error('Firebase config سیٹ نہیں ہوا — شیئر فیچر کام نہیں کرے گا۔ firebaseConfig میں اپنی قدریں ڈالیں۔');
+    return null;
+  }
+  try{
+    if(typeof firebase==='undefined')return null;
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    _fbDb=firebase.firestore();
+    return _fbDb;
+  }catch(e){console.error('Firebase init error:',e);return null;}
 }
 
-async function encodeShareData(obj){
-  try{
-    const json=JSON.stringify(obj);
-    const bytes=new TextEncoder().encode(json);
-    // اگر براؤزر gzip compression سپورٹ کرتا ہے تو لنک مزید چھوٹا کر دیں ('z' prefix)
-    if(typeof CompressionStream!=='undefined'){
-      try{
-        const cs=new CompressionStream('gzip');
-        const writer=cs.writable.getWriter();
-        writer.write(bytes);writer.close();
-        const compressed=await new Response(cs.readable).arrayBuffer();
-        return 'z'+_bytesToBase64Url(new Uint8Array(compressed));
-      }catch(e){/* compression failed, fall through to raw */}
-    }
-    return 'r'+_bytesToBase64Url(bytes); // raw، compression کے بغیر
-  }catch(e){console.error('Share encode error:',e);return null;}
+function genShareCode(){
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code='';
+  for(let i=0;i<8;i++)code+=chars.charAt(Math.floor(Math.random()*chars.length));
+  return code;
 }
 
-async function decodeShareData(str){
+async function saveShare(q,a){
+  const db=getFbDb();
+  if(!db)return null;
   try{
-    const mode=str.charAt(0);
-    const payload=str.slice(1);
-    const bytes=_base64UrlToBytes(payload);
-    let finalBytes=bytes;
-    if(mode==='z'){
-      const ds=new DecompressionStream('gzip');
-      const writer=ds.writable.getWriter();
-      writer.write(bytes);writer.close();
-      finalBytes=new Uint8Array(await new Response(ds.readable).arrayBuffer());
-    }
-    const json=new TextDecoder().decode(finalBytes);
-    return JSON.parse(json);
-  }catch(e){console.error('Share decode error:',e);return null;}
+    const code=genShareCode();
+    await db.collection('shares').doc(code).set({
+      q:q||'',
+      a:a||'',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return code;
+  }catch(e){console.error('Share save error:',e);return null;}
+}
+
+async function loadShare(code){
+  const db=getFbDb();
+  if(!db)return null;
+  try{
+    const snap=await db.collection('shares').doc(code).get();
+    return snap.exists?snap.data():null;
+  }catch(e){console.error('Share load error:',e);return null;}
 }
 
 async function shareAnswer(id){
   const item=_shareStore[id];
   if(!item){toast('شیئر نہیں ہو سکا','err');return;}
-  const code=await encodeShareData({q:item.q||'',a:item.a});
-  if(!code){toast('شیئر محفوظ نہیں ہو سکا','err');return;}
+  const code=await saveShare(item.q||'',item.a);
+  if(!code){toast('شیئر محفوظ نہیں ہو سکا — سرور سیٹ اپ چیک کریں','err');return;}
   
   const shareUrl=location.origin+location.pathname+'#s='+code;
   const shareText=(item.q?('سوال: '+item.q.slice(0,100)+(item.q.length>100?'…':''))+'\n\n':'')+'Al-Turath AI کا جواب دیکھیں:';
@@ -1769,7 +1781,7 @@ async function renderSharedLanding(){
   const code=hash.slice(3); // remove '#s='
   if(!code)return;
   
-  const item=await decodeShareData(code);
+  const item=await loadShare(code);
   if(!item)return;
   
   // ہنٹ: welcome اور input کو چھپا دو
