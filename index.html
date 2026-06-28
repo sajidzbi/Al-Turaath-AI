@@ -1640,79 +1640,70 @@ function renderMsg(role,text,ts,question){
   return row;
 }
 
-/* ══════════════════════ SHARE FEATURE (SHORT-CODE REGISTRY) ══════════════════════
-   بجائے لمبے base64 URL کے، ہر جواب کو ایک مختصر code دیتے ہیں (مثلاً sh_a1b2c3d4)
-   Q/A اور code کو IndexedDB میں محفوظ رکھتے ہیں
-   URL: https://sajidzbi.github.io/Al-Turaath-AI/#s=a1b2c3d4 (بہت مختصر!)
+/* ══════════════════════ SHARE FEATURE (SELF-CONTAINED LINK) ══════════════════════
+   Q/A کو IndexedDB میں محفوظ کرنے کی بجائے خود لنک (#s=...) کے اندر ہی انکوڈ کر دیتے
+   ہیں، تاکہ جو بھی لنک کھولے — اپنے ڈیوائس یا براؤزر میں، چاہے ایپ انسٹال ہو یا نہ ہو —
+   اسے ڈیٹا مل جائے۔ (پہلے کوڈ صرف بھیجنے والے کے IndexedDB میں محفوظ ہوتا تھا، اس لیے
+   لنک وصول کرنے والے کے پاس وہ ڈیٹا کبھی موجود ہی نہیں ہوتا تھا۔)
+   URL: https://sajidzbi.github.io/Al-Turaath-AI/#s=<encoded-data>
    ══════════════════════════════════════════════════════════════════════════════ */
 
-const SHARE_STORE='shares'; // IndexedDB store name
 const APP_HOME_URL='https://sajidzbi.github.io/Al-Turaath-AI/';
 const INSTALL_GUIDE_URL='./Al-Turath-AI-Installation_Guide.pdf';
-let _shareDb=null;
 
-function genShareCode(){
-  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let code='sh_';
-  for(let i=0;i<8;i++)code+=chars.charAt(Math.floor(Math.random()*chars.length));
-  return code;
+function _bytesToBase64Url(bytes){
+  let binary='';
+  for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function _base64UrlToBytes(str){
+  let b64=str.replace(/-/g,'+').replace(/_/g,'/');
+  while(b64.length%4)b64+='=';
+  const binary=atob(b64);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return bytes;
 }
 
-async function openShareDb(){
-  if(_shareDb)return _shareDb;
-  return new Promise((res,rej)=>{
-    const req=indexedDB.open('AlTurathShare',1);
-    req.onupgradeneeded=e=>{
-      const db=e.target.result;
-      if(!db.objectStoreNames.contains(SHARE_STORE)){
-        const store=db.createObjectStore(SHARE_STORE,{keyPath:'code'});
-        store.createIndex('createdAt','createdAt');
-      }
-    };
-    req.onsuccess=e=>{_shareDb=e.target.result;res(_shareDb);};
-    req.onerror=()=>rej(new Error('Failed to open share DB'));
-  });
-}
-
-async function saveShare(q,a,truncated){
+async function encodeShareData(obj){
   try{
-    const db=await openShareDb();
-    const code=genShareCode();
-    const item={code,q,a,truncated,createdAt:Date.now()};
-    await new Promise((res,rej)=>{
-      const tx=db.transaction(SHARE_STORE,'readwrite');
-      const req=tx.objectStore(SHARE_STORE).add(item);
-      tx.oncomplete=()=>res();
-      tx.onerror=()=>rej(tx.error);
-    });
-    return code;
-  }catch(e){console.error('Share save error:',e);return null;}
+    const json=JSON.stringify(obj);
+    const bytes=new TextEncoder().encode(json);
+    // اگر براؤزر gzip compression سپورٹ کرتا ہے تو لنک مزید چھوٹا کر دیں ('z' prefix)
+    if(typeof CompressionStream!=='undefined'){
+      try{
+        const cs=new CompressionStream('gzip');
+        const writer=cs.writable.getWriter();
+        writer.write(bytes);writer.close();
+        const compressed=await new Response(cs.readable).arrayBuffer();
+        return 'z'+_bytesToBase64Url(new Uint8Array(compressed));
+      }catch(e){/* compression failed, fall through to raw */}
+    }
+    return 'r'+_bytesToBase64Url(bytes); // raw، compression کے بغیر
+  }catch(e){console.error('Share encode error:',e);return null;}
 }
 
-async function loadShare(code){
+async function decodeShareData(str){
   try{
-    const db=await openShareDb();
-    return await new Promise((res,rej)=>{
-      const tx=db.transaction(SHARE_STORE,'readonly');
-      const req=tx.objectStore(SHARE_STORE).get(code);
-      req.onsuccess=()=>res(req.result||null);
-      req.onerror=()=>rej(req.error);
-    });
-  }catch(e){console.error('Share load error:',e);return null;}
-}
-
-function smartTruncate(s,max){
-  if(s.length<=max)return{text:s,truncated:false};
-  let cut=s.lastIndexOf('\n\n',max);
-  if(cut<max*0.5)cut=max;
-  return{text:s.slice(0,cut),truncated:true};
+    const mode=str.charAt(0);
+    const payload=str.slice(1);
+    const bytes=_base64UrlToBytes(payload);
+    let finalBytes=bytes;
+    if(mode==='z'){
+      const ds=new DecompressionStream('gzip');
+      const writer=ds.writable.getWriter();
+      writer.write(bytes);writer.close();
+      finalBytes=new Uint8Array(await new Response(ds.readable).arrayBuffer());
+    }
+    const json=new TextDecoder().decode(finalBytes);
+    return JSON.parse(json);
+  }catch(e){console.error('Share decode error:',e);return null;}
 }
 
 async function shareAnswer(id){
   const item=_shareStore[id];
   if(!item){toast('شیئر نہیں ہو سکا','err');return;}
-  const{text:a,truncated}=smartTruncate(item.a,8000);
-  const code=await saveShare(item.q||'',a,truncated);
+  const code=await encodeShareData({q:item.q||'',a:item.a});
   if(!code){toast('شیئر محفوظ نہیں ہو سکا','err');return;}
   
   const shareUrl=location.origin+location.pathname+'#s='+code;
@@ -1778,7 +1769,7 @@ async function renderSharedLanding(){
   const code=hash.slice(3); // remove '#s='
   if(!code)return;
   
-  const item=await loadShare(code);
+  const item=await decodeShareData(code);
   if(!item)return;
   
   // ہنٹ: welcome اور input کو چھپا دو
@@ -1793,7 +1784,6 @@ async function renderSharedLanding(){
   
   // جواب رینڈر کرو
   let answerText=item.a;
-  if(item.truncated)answerText+='\n\n📌 یہ جواب مختصر شدہ ہے — مکمل جواب کے لیے ایپ میں یہی سوال پھر سے پوچھیں۔';
   
   const answerRow=renderMsg('ai',answerText,null,item.q||'');
   
