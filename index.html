@@ -110,9 +110,9 @@ a{text-decoration:none}
 .sidebar{width:244px;min-width:244px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .28s,min-width .28s,background .3s}
 .sidebar.collapsed{width:0;min-width:0;border-right:none}
 
-.sb-brand{padding:14px 12px;border-bottom:1px solid var(--border);display:flex;direction:rtl;align-items:center;gap:10px;flex-shrink:0}
+.sb-brand{padding:14px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sb-logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(26,92,58,.3)}
-.sb-name{flex:1;min-width:0;text-align:right}
+.sb-name{flex:1;min-width:0}
 .sb-name-main{font-family:var(--brand);font-size:.82rem;font-weight:800;color:var(--text);letter-spacing:.3px;white-space:nowrap}
 .sb-name-main span{color:var(--gold-l)}
 
@@ -207,11 +207,11 @@ a{text-decoration:none}
 
 /* Domain cards */
 .domain-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:520px;width:100%;margin-bottom:20px}
-.domain-card{background:var(--glass);border:1px solid var(--border2);border-radius:14px;padding:16px 14px;cursor:pointer;transition:all .25s;text-align:right;backdrop-filter:blur(6px);position:relative;overflow:hidden}
+.domain-card{background:var(--glass);border:1px solid var(--border2);border-radius:14px;padding:16px 14px;cursor:pointer;transition:all .25s;text-align:left;backdrop-filter:blur(6px);position:relative;overflow:hidden}
 .domain-card::before{content:'';position:absolute;inset:0;border-radius:14px;background:linear-gradient(135deg,rgba(201,168,76,0.08),transparent);opacity:0;transition:opacity .25s}
 .domain-card:hover{border-color:var(--gold-b);transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.32)}
 .domain-card:hover::before{opacity:1}
-.dc-icon{font-size:1.15rem;margin-bottom:10px;margin-left:auto;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:rgba(201,168,76,0.12)}
+.dc-icon{font-size:1.15rem;margin-bottom:10px;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:rgba(201,168,76,0.12)}
 .dc-title{font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.3}
 .dc-desc{font-size:.66rem;color:var(--muted);line-height:1.5}
 
@@ -745,11 +745,11 @@ html,body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
       <h2>ABOUT AL-TURATH AI</h2>
       <button class="modal-x" onclick="closeModal('aboutModal')">✕</button>
     </div>
-    <div style="display:flex;direction:rtl;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border)">
       <div style="width:44px;height:44px;background:var(--accent);border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 18px rgba(26,92,58,.4)">
         <svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       </div>
-      <div style="text-align:right">
+      <div>
         <div style="font-family:var(--brand);font-size:.95rem;font-weight:800;background:linear-gradient(135deg,var(--text),var(--gold-l));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Al-Turath AI</div>
         <div style="font-size:.62rem;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-top:2px">Bridging Tradition with Innovation</div>
       </div>
@@ -1683,8 +1683,9 @@ function renderMsg(role,text,ts,question){
       </button>
     </div>`;
   }
-  const avatarHtml=`<div class="m-avatar">${role==='ai'?`<svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`:'👤'}</div>`;
-  const contentHtml=`
+  row.innerHTML=`
+    <div class="msg-inner">
+      <div class="m-avatar">${role==='ai'?`<svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`:'👤'}</div>
       <div class="m-content">
         <div class="m-meta">
           <span class="m-label">${role==='ai'?'Al-Turath AI':'You'}</span>
@@ -1692,13 +1693,8 @@ function renderMsg(role,text,ts,question){
         </div>
         <div class="m-text ${fontClass}" dir="${dirAttr}">${fmtMd(text)}</div>
         ${shareBtnHtml}
-      </div>`;
-  // AI's book-icon avatar sits on the right (RTL-appropriate) — achieved via DOM
-  // order alone (content before avatar) so the shared flex row/centering is never
-  // touched. User's avatar keeps its original left position, unchanged.
-  row.innerHTML=role==='ai'
-    ? `<div class="msg-inner">${contentHtml}${avatarHtml}</div>`
-    : `<div class="msg-inner">${avatarHtml}${contentHtml}</div>`;
+      </div>
+    </div>`;
   msgs.appendChild(row);
   if(role==='user'){wrap.scrollTop=wrap.scrollHeight;_lastUserQ=text;}
   return row;
@@ -2075,7 +2071,7 @@ async function autoLoadKeys(){
 function addThinking(){
   const id='tk'+Date.now();const msgs=document.getElementById('messages');
   const row=document.createElement('div');row.id=id;row.className='msg-row ai-row';
-  row.innerHTML=`<div class="msg-inner"><div class="m-content"><div class="m-meta"><span class="m-label">Al-Turath AI</span></div><div class="m-text"><div class="thinking"><span></span><span></span><span></span></div></div></div><div class="m-avatar"><svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div></div>`;
+  row.innerHTML=`<div class="msg-inner"><div class="m-avatar"><svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="m-content"><div class="m-meta"><span class="m-label">Al-Turath AI</span></div><div class="m-text"><div class="thinking"><span></span><span></span><span></span></div></div></div></div>`;
   msgs.appendChild(row);document.getElementById('msgsWrap').scrollTop=9999;return id;
 }
 function removeThinking(id){const el=document.getElementById(id);if(el)el.remove();}
