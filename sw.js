@@ -2,7 +2,7 @@
    App-shell caching only. API calls (generativelanguage.googleapis.com) are
    never intercepted — they always go straight to the network. Bump CACHE_NAME
    on every deploy so returning users automatically get the new shell. */
-const CACHE_NAME = 'al-turath-shell-v11';
+const CACHE_NAME = 'al-turath-shell-v12';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -56,8 +56,15 @@ self.addEventListener('fetch', (event) => {
         }
         return res;
       }).catch(() => {
-        // Offline fallback for page navigations
-        if (req.mode === 'navigate') return caches.match('./index.html');
+        // Offline fallback — ONLY for navigations to the app shell itself.
+        // Previously this fired for ANY navigation, including a PDF opened in
+        // a new tab (e.g. the install-guide link): a transient network blip
+        // would silently serve cached index.html in place of the PDF, which
+        // the browser then failed to render as a PDF ("Error" opening it).
+        // A request for a specific file (has an extension, e.g. .pdf) is now
+        // left to fail naturally / retry, never masqueraded as the app shell.
+        const isAppShellNav = req.mode === 'navigate' && !/\.[a-z0-9]+$/i.test(url.pathname);
+        if (isAppShellNav) return caches.match('./index.html');
         return cached;
       });
     })
