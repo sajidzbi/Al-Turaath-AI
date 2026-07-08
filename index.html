@@ -1537,6 +1537,7 @@ async function sendQ(){
   const tkId=addThinking();
   let success=false,fullReply='';
 
+  try{
   /* ── Analyze question complexity (decide: Flash 2.5 vs 3.1) ── */
   const analysis=await analyzeQuestionComplexity(q);
   // Complex/moderate → try Flash 2.5 across all keys first, then Flash Lite.
@@ -1547,7 +1548,6 @@ async function sendQ(){
   const pick=pickKeyAndModel(preferOrder);
   if(!pick){
     toast('آج کی حد ختم ہو گئی ہے۔ کل دوبارہ کوشش کریں۔','err');
-    isLoading=false;document.getElementById('sendBtn').disabled=false;
     removeThinking(tkId);return;
   }
   let preferredModel=modelNameOf[pick.modelType];
@@ -1573,6 +1573,14 @@ async function sendQ(){
   const liveKeys=apiKeys.filter(k=>k&&k.key&&!k.dead).map(k=>k.key);
   // Start with the key chosen by the quota-aware picker, fallback to others only on real failures
   const orderedKeys=[pick.key,...liveKeys.filter(k=>k!==pick.key)];
+
+  // Hard cap on MAX_TOKENS continuations — previously "attempts=0" reset on every
+  // continuation meant a long answer that kept hitting the token limit could
+  // continue calling the API indefinitely with no upper bound at all, which is
+  // exactly what produced the "response takes unusually long" symptom. Six
+  // continuations (~24K tokens) is far more than any answer needs.
+  let totalContinuations=0;
+  const MAX_CONTINUATIONS=6;
 
   for(let ki=0;ki<orderedKeys.length&&!success;ki++){
     const currentKey=orderedKeys[ki];
@@ -1621,7 +1629,7 @@ async function sendQ(){
           const modelType=modelMap[currentModel]||'FLASH25';
           consumeQuota(currentKey,modelType);
           
-          if(fin==='MAX_TOKENS'){attempts=0;continue;}
+          if(fin==='MAX_TOKENS'&&totalContinuations<MAX_CONTINUATIONS){totalContinuations++;attempts=0;continue;}
           const rt=Date.now();removeThinking(tkId);
           const row=renderMsg('ai',fullReply,rt,q);
           setTimeout(()=>row.scrollIntoView({behavior:'smooth',block:'start'}),60);
@@ -1648,7 +1656,19 @@ async function sendQ(){
     }
   }
   if(!success){removeThinking(tkId);renderMsg('ai',fullReply||ERR.quota,Date.now(),q);}
-  isLoading=false;updateKeyStatus();
+  }catch(fatalErr){
+    // Absolute safety net: no matter what unexpected error occurs anywhere
+    // above, the user must never be left staring at a permanent "thinking…"
+    // bubble or a frozen Send button that only a full app refresh could fix.
+    console.error('sendQ fatal error:',fatalErr);
+    removeThinking(tkId);
+    renderMsg('ai',fullReply||ERR.default,Date.now(),q);
+  }finally{
+    // Runs no matter how the block above exits (success, handled failure,
+    // early return, or an unforeseen exception) — the Send button and the
+    // ability to ask the next question are always restored.
+    isLoading=false;updateKeyStatus();
+  }
 }
 
 /* ══ RENDERING ══ */
