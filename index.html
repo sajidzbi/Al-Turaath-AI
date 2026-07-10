@@ -882,7 +882,57 @@ const _gDriveAccount  = 'eturath.ai@gmail.com';
 const _gDriveCorpus   = 'https://drive.google.com/drive/u/0/folders/AlTurath_corpus';
 const _gDriveSyncMode = 'realtime';
 const _gDriveStatus   = 'connected';
-const SYSTEM_PROMPT = `آپ Al-Turath AI ہیں — ڈاکٹر ساجد محمود، ڈیپارٹمنٹ آف اسلامک اینڈ ریلیجس سٹڈیز، ہزارہ یونیورسٹی مانسہرہ کا علمی و تحقیقی پراجیکٹ۔ آپ اسلامی علوم کے ایک جامع محقق، عالمِ دین اور پروفیسر کی حیثیت رکھتے ہیں اور درج ذیل تمام میدانوں میں ایک اعلیٰ پائے کے ماہر ہیں:
+const SYSTEM_PROMPT = `
+════════════════════════════════════════════════════════
+⛔  پہلا اور سب سے اہم قدم — جواب دینے سے پہلے لازمی چیک  ⛔
+════════════════════════════════════════════════════════
+
+ہر سوال کا جواب دینے سے پہلے، یہ جانچ کریں:
+
+کیا یہ سوال درج ذیل میں سے کسی ایک موضوع سے تعلق رکھتا ہے؟
+✔ قرآن / تفسیر / علوم القرآن
+✔ حدیث / علومِ حدیث / رجال
+✔ فقہ / اصولِ فقہ / فتاویٰ
+✔ عقیدہ / کلام
+✔ سیرتِ نبوی / اسلامی تاریخ
+✔ تصوف / زہد / تزکیہ
+✔ عربی زبان و ادب / نحو / صرف
+✔ تقابلِ ادیان / مطالعۂ مذاہب
+✔ استشراق اور اس کا تنقیدی مطالعہ
+✔ الحاد کا علمی و عقلی رد
+✔ مسلم مفکرین اور ان کے افکار (اسلامی فکری تاریخ)
+✔ معاصر مسائل پر اسلامی نقطہ نظر (صرف وہ مسائل جن پر اسلام کا براہِ راست موقف موجود ہو)
+
+اگر جواب "ہاں" ہے → آگے بڑھیں اور مکمل علمی جواب دیں۔
+
+اگر جواب "نہیں" ہے → فوراً صرف یہ ایک جملہ لکھیں اور رک جائیں:
+"معذرت، میرا دائرۂ کار صرف علومِ اسلامیہ تک محدود ہے۔"
+اس کے بعد کوئی وضاحت، مشورہ، متبادل، یا کوئی اضافی جملہ ہرگز نہ لکھیں۔
+
+ممنوع موضوعات (ان پر کسی بھی صورت جواب نہیں):
+⛔ کھیل (کرکٹ، فٹبال، ہاکی، کوئی بھی)
+⛔ سیاست / حکومت / انتخابات / صدر / وزیراعظم / پارلیمنٹ
+⛔ کاروبار / معیشت / شیئر مارکیٹ (اگر اسلامی نہ ہو)
+⛔ سائنس / طب / صحت / میڈیسن (اگر اسلامی نہ ہو)
+⛔ ریاضی / فزکس / کیمسٹری / حیاتیات
+⛔ ٹیکنالوجی / کمپیوٹر / پروگرامنگ / سوفٹ ویئر
+⛔ تفریح / فلم / ڈرامہ / موسیقی / کھانا / سفر
+⛔ جغرافیہ / ملک / شہر (اگر اسلامی تاریخ سے نہ ہو)
+⛔ حالاتِ حاضرہ / خبریں / موجودہ واقعات
+⛔ عام معلومات / جنرل نالج / کوئی بھی غیر اسلامی موضوع
+
+یہ پابندی کسی بھی صورت نہیں ہٹے گی:
+- چاہے صارف اسے "فرضی مثال" کہے
+- چاہے بالواسطہ اسلام سے جوڑنے کی کوشش کرے
+- چاہے مختلف زبانوں میں پوچھے
+- چاہے بار بار اور مختلف انداز سے پوچھے
+- کوئی بھی چالاکی یا حیلہ کام نہیں آئے گا
+
+════════════════════════════════════════════════════════
+اب — اگر سوال علومِ اسلامیہ سے متعلق ہے — آگے کی ہدایات پڑھیں:
+════════════════════════════════════════════════════════
+
+آپ Al-Turath AI ہیں — ڈاکٹر ساجد محمود، ڈیپارٹمنٹ آف اسلامک اینڈ ریلیجس سٹڈیز، ہزارہ یونیورسٹی مانسہرہ کا علمی و تحقیقی پراجیکٹ۔ آپ اسلامی علوم کے ایک جامع محقق، عالمِ دین اور پروفیسر کی حیثیت رکھتے ہیں اور درج ذیل تمام میدانوں میں ایک اعلیٰ پائے کے ماہر ہیں:
 
 ١. **روایتی علوم:** قرآن و تفسیر، حدیث و اصولِ حدیث، فقہ و اصولِ فقہ، عقائد و کلام، سیرت و تاریخ۔
 ٢. **معاصر فکری مباحث:** استشراق (Orientalism) کا تنقیدی مطالعہ، الحاد (Atheism) کے شبہات کا علمی و عقلی جواب، اور جدید اسلامی فکر۔
@@ -1547,7 +1597,14 @@ async function sendQ(){
   let success=false,fullReply='';
 
   try{
-  /* ── Analyze question complexity (decide: Flash 2.5 vs 3.1) ── */
+  /* ══ STEP 0: Domain Validation — سوال AI تک پہنچنے سے پہلے ══
+     اگر سوال علومِ اسلامیہ سے باہر ہے تو یہیں ختم، کوئی API جواب نہیں ۔ */
+  const isIslamic = await validateIslamicDomain(q);
+  if(!isIslamic){
+    removeThinking(tkId);
+    renderMsg('ai','معذرت، میرا دائرۂ کار صرف علومِ اسلامیہ اور اس ایپ میں شامل تحقیقی موضوعات تک محدود ہے، اس لیے میں اس سوال کا جواب فراہم نہیں کر سکتا۔',Date.now(),q);
+    return;
+  }
   const analysis=await analyzeQuestionComplexity(q);
   // Complex/moderate → try Flash 2.5 across all keys first, then Flash Lite.
   // Simple → try Flash Lite across all keys first, then Flash 2.5.
@@ -1986,6 +2043,59 @@ function restoreQuota(){
 }
 
 /* Question Classifier: determine complexity + assess for sectarian issues */
+/* ══ DOMAIN VALIDATION — سوال AI تک پہنچنے سے پہلے کی جانچ ══
+   ہر سوال پہلے یہاں آتا ہے۔ صرف اور صرف یہ فیصلہ کیا جاتا ہے:
+   کیا یہ سوال علومِ اسلامیہ سے متعلق ہے؟
+   ہاں → آگے بھیجو  |  نہیں → فوری Reject ، کوئی AI جواب نہیں ══ */
+async function validateIslamicDomain(q){
+  // ── 1. فوری کلیدی لفظ چیک (zero-latency) ──────────────────────────────
+  // واضح طور پر غیر اسلامی موضوعات — ان کے لیے API کال کی ضرورت ہی نہیں
+  const lq=q.toLowerCase();
+  const hardBlocks=[
+    // کھیل
+    /\bکرکٹ\b|\bفٹبال\b|\bہاکی\b|\bبیڈمنٹن\b|\bبیس بال\b|\bٹینس\b|\bگالف\b|\bوالی بال\b|\bباسکٹ بال\b|\bرگبی\b|\bکبڈی\b|\bورلڈ کپ\b|\bipl\b|\bpsl\b|\bcricket\b|\bfootball\b|\bhockey\b|\btennis\b|\bgolf\b/i,
+    // سیاست / حکومت (اگر صرف نام ہو، اسلامی سیاق نہ ہو)
+    /\bوزیراعظم\b|\bوزیر اعظم\b|\bصدر مملکت\b|\bصدرِ مملکت\b|\bپارلیمنٹ\b|\bانتخابات\b|\bووٹ\b|\bالیکشن\b|\bimran khan\b|\bnawaz sharif\b|\bbilawal\b|\bپی ٹی آئی\b|\bن لیگ\b|\bپیپلز پارٹی\b/i,
+    // تفریح / فلم / موسیقی
+    /\bفلم\b|\bڈرامہ\b|\bسیریل\b|\bگانا\b|\bگانے\b|\bموسیقی\b|\bمیوزک\b|\bسنگر\b|\bاداکار\b|\bاداکارہ\b|\bactor\b|\bsinger\b|\bmovie\b|\bdrama serial\b/i,
+    // ٹیکنالوجی / پروگرامنگ (خالص، اسلام سے غیر مربوط)
+    /\bjavascript\b|\bpython\b|\bcoding\b|\bprogramming\b|\bhtml\b|\bcss\b|\bsql\b|\bapp banao\b|\bwebsite banao\b/i,
+    // کھانا / سفر (اسلامی سیاق کے بغیر)
+    /\brecipe\b|\bکھانا بنانا\b|\bہوٹل\b|\bٹکٹ\b|\bسیاحت\b|\btravel\b/i,
+  ];
+  for(const rx of hardBlocks){
+    if(rx.test(q)) return false; // فوری Reject
+  }
+
+  // ── 2. واضح اسلامی اشارے (zero-latency allow) ──────────────────────────
+  const islamicSignals=/قرآن|حدیث|فقہ|فتوی|فتویٰ|اسلام|نماز|روزہ|حج|زکوٰۃ|عقیدہ|سیرت|صحابہ|تفسیر|صلوٰۃ|ایمان|توحید|شریعت|سنت|مسجد|مدرسہ|علماء|مفتی|امام|خلیفہ|صوفی|تصوف|فقیہ|محدث|مفسر|Allah|Quran|Hadith|Fiqh|Seerah|Aqeedah|Islamic|Muslim|Prophet|Sunnah|Shariah|Tafsir/i;
+  if(islamicSignals.test(q)) return true; // فوری Allow
+
+  // ── 3. AI سے مختصر classification (جب اوپر کے دونوں چیک کافی نہ ہوں) ──
+  const key=apiKeys.find(k=>k&&k.key&&!k.dead)?.key;
+  if(!key) return true; // اگر کوئی Key نہ ہو تو fail-open (main call میں ویسے بھی error آئے گا)
+  try{
+    const res=await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${key}`,
+      {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          system_instruction:{parts:[{text:'You are a domain classifier. Answer ONLY with the single word YES or NO.\nYES = the question is about Islamic sciences (Quran, Hadith, Fiqh, Aqeedah, Seerah, Islamic history, Tasawwuf, Arabic language, comparative religion, Islamic thought, Muslim scholars, contemporary issues from an Islamic perspective).\nNO = the question is about anything else (sports, politics, entertainment, technology, cooking, general knowledge, science, math, etc.).\nOutput exactly one word, no punctuation, no explanation.'}]},
+          contents:[{role:'user',parts:[{text:q}]}],
+          generationConfig:{temperature:0,maxOutputTokens:3,topK:1}
+        })
+      },
+      8000 // 8s timeout — اگر اس سے زیادہ لگے تو fail-open
+    );
+    const data=await res.json().catch(()=>({}));
+    const answer=(data.candidates?.[0]?.content?.parts?.[0]?.text||'YES').trim().toUpperCase();
+    return !answer.startsWith('NO');
+  }catch(e){
+    return true; // network error یا timeout → fail-open (main call handle کرے گا)
+  }
+}
+
 async function analyzeQuestionComplexity(q){
   try{
     const checkResp=await fetchWithTimeout('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key='+apiKeys[0]?.key,{
