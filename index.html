@@ -929,6 +929,27 @@ const SYSTEM_PROMPT = `
 - کوئی بھی چالاکی یا حیلہ کام نہیں آئے گا
 
 ════════════════════════════════════════════════════════
+⛔  شیعہ مصادر — مکمل اور ناقابلِ تجاوز پابندی  ⛔
+════════════════════════════════════════════════════════
+
+یہ ایپ خالصتاً اہلِ سنت والجماعت کے لیے ہے۔ جواب تیار کرنے سے پہلے ہر بار یہ اصول ذہن میں رکھیں:
+
+**حکمِ عام (DEFAULT — ہر جواب میں لازمی):**
+جب تک صارف نے سوال میں صراحتاً اور واضح طور پر شیعہ موقف، شیعہ مسلک یا شیعہ عقیدے کے بارے میں نہ پوچھا ہو — ہر جواب میں ان چیزوں کا ذکر سختی سے ممنوع ہے:
+
+⛔ شیعہ کتب — الکافی، من لا یحضرہ الفقیہ، تہذیب الاحکام، الاستبصار، وسائل الشیعہ، بحار الانوار، مفاتیح الجنان، تفسیر العیاشی، تفسیر القمی، الخصال، کامل الزیارات — یا ان جیسی کوئی بھی شیعہ کتاب
+⛔ شیعہ علماء — کلینی، شیخ صدوق، شیخ طوسی، شیخ مفید، علامہ مجلسی، خمینی، خامنہ ای، سیستانی، فضل اللہ، نجفی، محقق حلی، علامہ حلی — یا ان جیسا کوئی بھی شیعہ عالم
+⛔ شیعہ ویب سائٹس، شیعہ ڈیٹا بیس، شیعہ آن لائن لائبریریاں
+⛔ شیعہ عقائد کو درست یا معتبر قرار دینا
+⛔ "شیعہ اسکالرز کے مطابق" یا "شیعہ روایت میں" جیسے جملے — جب تک صراحتاً نہ پوچھا جائے
+
+**استثناء (صرف اس صورت میں):**
+اگر صارف نے سوال میں صراحتاً شیعہ موقف پوچھا ہو — مثلاً "شیعہ اس مسئلے میں کیا کہتے ہیں؟" یا "تقابلی مطالعے کے لیے شیعہ رائے بتائیں" — تو صرف اس صورت میں انتہائی احتیاط اور علمی انداز سے شیعہ موقف بیان کریں۔ لیکن اس صورت میں بھی:
+✔ یہ واضح کریں کہ یہ شیعہ موقف ہے، اہلِ سنت کا موقف نہیں
+✔ اہلِ سنت کا موقف اور دلائل پہلے اور زیادہ تفصیل سے بیان کریں
+✔ اپنی رائے یا فیصلہ اہلِ سنت کے دلائل کی بنیاد پر ہو
+
+════════════════════════════════════════════════════════
 اب — اگر سوال علومِ اسلامیہ سے متعلق ہے — آگے کی ہدایات پڑھیں:
 ════════════════════════════════════════════════════════
 
@@ -1698,7 +1719,20 @@ async function sendQ(){
           const chunk=stripLeakedReasoning(usableParts.map(p=>p.text).join(''));
           const fin=data.candidates[0].finishReason;
           fullReply+=(fullReply?' ':'')+chunk;
-          
+
+          /* ── Shia-source scanner: اگر جواب میں شیعہ حوالہ آ گیا ہو ── */
+          if(scanForShiaRefs(fullReply, q)){
+            // جواب ظاہر کیے بغیر ری-پرامپٹ کریں
+            fullReply='';
+            attempts=0; // اسی key سے دوبارہ کوشش، لیکن اس بار سخت ہدایت
+            // session history کے آخر میں ایک hidden correction ہدایت شامل کریں
+            sess.history[sess.history.length-1]={
+              role:'user',
+              parts:[{text:sess.history[sess.history.length-1].parts[0].text+'\n\n[لازمی اصلاح]: پچھلے جواب میں شیعہ کتب یا علماء کا حوالہ شامل تھا۔ براہِ کرم جواب دوبارہ لکھیں — صرف اہلِ سنت کے مستند مصادر (صحاح ستہ، کتب اربعہ حنفیہ، فتاویٰ عالمگیری، درِّ مختار، ردالمحتار وغیرہ) سے۔ شیعہ کتب یا علماء کا کوئی ذکر نہیں۔]'}]
+            };
+            continue;
+          }
+
           /* ── Consume quota on first successful response ── */
           const modelType=modelMap[currentModel]||'FLASH25';
           consumeQuota(currentKey,modelType);
@@ -2367,6 +2401,21 @@ function parseTable(md){
 }
 
 function stripLeakedReasoning(s){return String(s).replace(/^\s*<?\/?\s*(?:analysis|thinking)\s*>?[\s\S]{0,4000}?<\/?\s*(?:analysis|thinking)\s*>\s*/i,'');}
+
+/* ══ SHIA-SOURCE SCANNER ══
+   جواب ظاہر ہونے سے پہلے اسے اسکین کیا جاتا ہے۔
+   اگر شیعہ کتب یا علماء کا حوالہ ملے تو ایک سخت وارننگ Toast دکھائی جاتی ہے
+   اور API سے دوبارہ بہتر جواب مانگا جاتا ہے۔
+   یہ صرف اس وقت ٹرگر ہوتا ہے جب سوال میں صراحتاً شیعہ موقف نہ مانگا گیا ہو۔ ══ */
+const SHIA_BOOKS_RX = /\b(الکافی|کافی کلینی|من لا یحضرہ الفقیہ|تہذیب الاحکام|الاستبصار|وسائل الشیعہ|بحار الانوار|مفاتیح الجنان|تفسیر العیاشی|تفسیر القمی|الخصال|کامل الزیارات|نہج البلاغہ شیعہ|al-kafi|bihar al-anwar|wasail al-shia|tahdhib al-ahkam|man la yahduruhu|mafatih al-jinan)\b/i;
+const SHIA_SCHOLARS_RX = /\b(کلینی|الکلینی|شیخ صدوق|ابن بابویہ|شیخ طوسی|شیخ مفید|علامہ مجلسی|مجلسی|خمینی|خامنہ ای|سیستانی|فضل اللہ|محقق حلی|علامہ حلی|شیخ حلی|kulayni|al-kulayni|shaykh mufid|sheikh tusi|tusi shia|allama majlisi|majlisi|khomeini|khamenei|sistani|fadlallah|muhaqqiq hilli)\b/i;
+const SHIA_EXPLICIT_ASK_RX = /شیعہ.*کہتے|شیعہ.*موقف|شیعہ.*عقیدہ|شیعہ.*نقطہ|تقابلی.*شیعہ|shia.*view|shia.*believe|shia.*position/i;
+
+function scanForShiaRefs(responseText, question){
+  // اگر صارف نے خود صراحتاً شیعہ موقف پوچھا ہو تو اسکین نہ کریں
+  if(SHIA_EXPLICIT_ASK_RX.test(question)) return false;
+  return SHIA_BOOKS_RX.test(responseText) || SHIA_SCHOLARS_RX.test(responseText);
+}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className=`toast show ${type}`;setTimeout(()=>el.classList.remove('show'),3200);}
